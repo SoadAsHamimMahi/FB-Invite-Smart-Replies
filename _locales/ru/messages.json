@@ -1,0 +1,68 @@
+{
+  "you_stop": {
+    "message":"Вы остановили скрипт!"
+  },
+  "redirect": {
+    "message":"Запустите скрипт еще раз, после того как откроется вкладка \"Публикации\"."
+  },
+  "total_inv_sent": {
+    "message":"Всего приглашений отправлено:"
+  },
+  "posts_checked": {
+    "message":"Публикаций проверено:"
+  },
+  "do_not_use_anymore": {
+    "message":"НЕ используйте больше сегодня этот скрипт, так как у Фейсбука есть лимит на приглашения."
+  },
+  "inviting_everyone": {
+    "message":"Проверяю только <b>ПУБЛИКАЦИИ и фото</b>. Для <span style='color:green'>инвайта тех, кому понравились ваши комментарии</span>:<br><span style='color:red;font-weight:bold;'>new:</span> <span style='color:blue'>лайк все комментарии и инвайт</span>: <a target=\"_blank\" href=\"https://www.invitelikecomment.com/\">https://www.invitelikecomment.com/</a>"
+  },
+  "total_invited": {
+    "message":"Всего приглашено:"
+  },
+  "switch_tab_info": {
+    "message":"НЕ меняйте вкладку и НЕ сворачивайте. Вы можете открыть другие окна поверх этого, а также одновременно запустить 2+ скрипта."
+  },
+  "done": {
+    "message":"Готово!"
+  },
+  "start_inv": {
+    "message":"Нажмите чтобы рассылать приглашения"
+  },
+  "paused": {
+    "message":". Пазуа 30 сек (после каждых 40 приглашений)."
+  },
+  "review": {
+    "message":"Вам понравилось? Пожалуйста, не поленитесь и оставьте свой отзыв, а также попробуйте программку для комментариев :)"
+  },
+  "error1": {
+    "message":"ОШИБКА! Публикаций не найдено! Запустите программку на вкладке «Публикации» или «Фото» на вашей странице. Если не работает - свяжитесь со мной по info@invitelikecomment.com и я постараюсь вам помочь ;)"
+  },
+  "facebook_limit_block": {
+    "message":"Error: Facebook popup message shown, read it. If you see an error 'going too fast' or 'anti spam limitation': <b>click on 'let us know' and (important!) report this to Facebook</b>, set timeout 8-10 sec for invites (or 10-15 for comments) and <b>do not use Facebook at the same time</b>. Try again in 24h. This happens rarely even if you invite/scroll manually."
+  },
+  "after_text1": {
+    "message":"Нравится? Поделись с друзьями и <b>оставь отзыв.</b>"
+  },
+  "after_done": {
+    "message":"Готово"
+  },
+  "after_share": {
+    "message":"Поделиться"
+  },
+  "after_rate": {
+    "message":"Отзыв"
+  },
+  "after_scan_posts": {
+    "message":"Проверить публикации"
+  },
+  "after_scan_comments": {
+    "message":"Проверить и комментарии"
+  },
+  "after_close": {
+    "message":"Закрыть"
+  },
+  "after_ads_comments": {
+    "message":"Также проверьте расширение, которое <span style=\"color:green;font-weight:bold;\">лайкает, инвайтит и отвечает на все комментарии</span> (а также отправляет личные сообщения и др.)."
+  }
+}

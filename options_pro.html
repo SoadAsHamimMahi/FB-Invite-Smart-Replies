@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head><title>Settings</title></head>
+<style>
+    @import url('https://fonts.googleapis.com/css?family=Open+Sans:400,600,700');
+@import url('https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css');
+
+main>*, main>*:before, main>*:after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100vh;
+}
+
+body {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+  color: #555;
+  background: #eee;
+      font-size: 100%;
+}
+button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
+body{
+font-size: 100%;
+}
+table{
+border: 1px solid black;
+}
+td {
+   border-right: 1px solid black;
+   border-left: 1px solid black;
+   padding:5px;
+}
+button:hover{
+cursor:pointer;
+opacity: 0.8;
+}
+h1 {
+  font-weight: 400;
+  text-align: center;
+}
+
+p {
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+main {
+  min-width: 320px;
+  max-width: 1200px;
+  padding: 50px;
+  margin: 0 auto;
+  background: #fff;
+}
+
+section {
+  display: none;
+  padding: 20px 0 0;
+  border-top: 1px solid #ddd;
+}
+
+input[type="radio"]{
+    visibility:hidden;
+}
+
+label {
+  display: inline-block;
+  margin: 0 0 -1px;
+  
+  font-weight: 600;
+  color: #000;
+  border: 1px solid transparent;
+}
+main>label{
+padding: 15px 25px;
+}
+
+label:before {
+  font-family: fontawesome;
+  font-weight: normal;
+  margin-right: 10px;
+}
+
+label[for*='1']:before { content: '\0231A'; }
+label[for*='2']:before { content: '\f118'; }
+label[for*='3']:before { content: '\1F4AC'; }
+label[for*='4']:before { content: '\f1de'; }
+
+label:hover {
+  color: #888;
+  cursor: pointer;
+}
+
+input[type="radio"]:checked + label {
+  color: #555;
+  border: 1px solid #ddd;
+  border-top: 2px solid orange;
+  border-bottom: 1px solid #fff;
+}
+
+#tab1:checked ~ #content1,
+#tab2:checked ~ #content2,
+#tab3:checked ~ #content3,
+#tab4:checked ~ #content4 {
+  display: block;
+}
+
+@media screen and (max-width: 1050px) {
+  label:before {
+    margin: 0;
+    font-size: 18px;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  label {
+    padding: 15px;
+  }
+}
+</style>
+<body data-theme="dark">
+
+<h1>SETTINGS</h1>
+
+
+<main>
+  
+  <input id="tab1" type="radio" name="tabs" checked>
+  <label for="tab1">Random Time Settings</label>
+    
+  <input id="tab2" type="radio" name="tabs">
+  <label for="tab2">Invite Filters</label>
+    
+  <input id="tab3" type="radio" name="tabs">
+  <label for="tab3">Shared posts</label>
+  
+  <input id="tab4" type="radio" name="tabs">
+  <label for="tab4">Daily limit & other</label>
+
+  
+<section id="content1">
+<p>
+<b>To simulate human clicks, we always need some random</b>, so you choose 2 numbers and then a random number in that range will be used for each click.
+<br><span style="color:red">Important: if you invite too fast FB can ban the use of Invites for 24 hours. Min value should be at least 2 sec.</span> Default timeouts are good, but if you were limited for 1 day - you have to increase the timeout to 3+ sec. <b>And do not use Facebook at the same time you run the script!</b>
+</p>
+<div id="status1" style="color:red;font-weight:bold;"></div>
+<b>Random pause after each invite</b> between 
+<select id="p1_1"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="8">8</option><option value="13">13</option><option value="18">18</option><option value="30">30</option><option value="50">50</option><option value="80">80</option><option value="150">150</option><option value="180">180</option></select> to <select id="p1_2"><option value="2.5">2.5</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="7">7</option><option value="8">8</option><option value="10">10</option><option value="15">15</option><option value="22">22</option><option value="35">35</option><option value="55">55</option><option value="75">75</option><option value="90">90</option><option value="150">150</option><option value="180">180</option></select> seconds.
+<br>
+<label><input type="checkbox" id="additional_script_pause">Additional pause for 30 sec every 40 invites sent (or likes/comments posted).</label>
+<br><br>
+<b>Scroll <input name="scroll_before_inv_nr" value="0" type="number" min="0" max="999"> times the post likers list before starting inviting</b> (in case you are limited too often, try this feature).
+<br>Additional delay <input name="fb_limit_show_more_btn_add_sec" value="0" type="number" min="1" max="600"> seconds between scrolls.
+
+
+
+
+<br><br><br>
+<h2>Important - how to continue your work while script is working</h2>
+Browser may stop any extension if the page is not visible on the screen. So we can't scroll and click if the page is in the background completely. Just leave it on the second monitor or open another window for 95% of your screen, <a href="#" id="imgInfoShow1"><span style="color:red">click here to see/hide the example</span></a>
+<img id="img-select" style="display:none;width:100%" src="page_must_be_visible.jpg">
+
+
+  </section>
+    
+  <section id="content2">
+    <b>Optional:</b>
+<br>
+<!--<label><input type="checkbox" id="check_post_first" checked>If there is a post opened - check its likes first.</label>
+<br>-->
+<label><input type="checkbox" id="skip_like_emotion">Do not invite people who put <img src="fbicons/react_like.png"> like.</label>
+<br><label><input type="checkbox" id="skip_love_emotion">Do not invite people who put <img src="fbicons/react_love.png"> love reaction.</label>
+<br><label><input type="checkbox" id="skip_haha_emotion">Do not invite people who put <img src="fbicons/haha.png"> haha reaction.</label>
+<br><label><input type="checkbox" id="skip_wow_emotion">Do not invite people who put <img src="fbicons/react_wow.png"> wow reaction.</label>
+<br><label><input type="checkbox" id="skip_sad_emotion">Do not invite people who put <img src="fbicons/sad.png"> sad reaction.</label>
+<br><label><input type="checkbox" id="skip_angry_emotion">Do not invite people who put <img src="fbicons/angry.png"> angry reaction.</label>
+<br><br>
+<span style="color:red;">NEW!</span> By default we scan likes in 'All' tab (where you can see all reactions together) but you may want scan them separately by tab (this feature breaks when facebook updates icons of reactions and we fix it with new update):
+<br><label><input type="checkbox" id="scan_reactions_tabs_more1">Scan post likers in separated tabs: like, love, haha etc if post has MORE THAN 1000 reactions.</label>
+<br><label><input type="checkbox" id="scan_reactions_tabs">ALWAYS scan post likers in separated tabs (reaction filters will be applied), more time is requested.</label>
+<br>For invite Friends (or page followers to the group): skip first <input name="friends_skip_nr" value="0" type="number" min="0" max="5000"> friends in the list and don't select them (may be useful when some users can't be invited due to some bug).
+
+<br>
+  </section>
+  
+  
+  <section id="content3">
+  <p>
+<label><input type="checkbox" id="share_put_likes"><span style='color:red'><b>Bonus.</b></span> <span style='color:green'><b>POPULAR: check shared posts and automatically put likes on them</b></span>. This feature is available only if you run the extension in <b>Publishing Tools Tab (best option) or in business.facebook.com -> Page Posts (for dark posts)</b>.</label>
+<br>If you put too many likes you will need to solve the captcha, so you can limit likes here (for a single run): <input name="share_likes_limit" value="100" type="number" min="1" max="5000">. It uses same timeouts as for Invites.
+<br><label><input type="checkbox" id="stop_on_captcha_shown">Stop if captcha is shown (BETA) - I need more tests, because I have never seen captcha in last 6 months.</label>
+<br><label><input type="checkbox" id="do_not_check_who_comments">Do not change the commentator of the shared post and skip the check.</label> By default, script checks if the commentator is the same person who posted a post. If not, it tries to change the commentator if that is possible, otherwise it skips it. If you enable this option - script will just post a comment without checking who is posting: you or the page.<br><b>Do not post comments with my private accounts</b>, which is (full name as it is in Facebook, comma separated): <input name="do_not_check_shared_my_name_skip" value="" type="text">
+
+<br><br><b>To comment all shared posts automatically</b> write text (min. 5 characters):
+<br><input name="text_comm_shares" value="" type="text" style="width: 500px;">
+<br>
+
+<b>Pause</b> after each comment from <select id="pc_1"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="300">300</option></select> to <select id="pc_2"><option value="10">10</option><option value="15" selected>15</option><option value="30">30</option><option value="60">60</option><option value="90">90</option><option value="120">120</option><option value="300">300</option><option value="600">600</option><option value="900">900</option></select> seconds.
+<br>
+Limit comments posted for each run (if you comment too much captcha can be shown): <input name="share_comments_limit" value="100" type="number" min="1" max="5000">
+<br><br>
+Skip shared posts for next people (for example your own name, comma separated): <input name="shares_reply_ignore_string" value="" type="text" style="width: 500px;">
+</p>
+</section>
+    
+  <section id="content4">
+    
+<p>
+Facebook sets personal limits to every person. Usually, you have <b>500 invite limit for a day or some hours</b>, then it changes, depends on how much invites were accepted and how many you've sent in a week/month. So here you can set a limit after which the extension will be stopped automatically. Once you reach the limit - try again in 3-4 hours. You can also use second profile that manage the page to invite more on the same day.
+</p>
+Limit for single run: <input name="fb_limit" value="490" type="number" min="1" max="5000">
+<br>Facebook doesn't like if we click too many "show more" buttons (or scroll too many times the list), so it's better to not click more than 200 per post (manually you arrive max to 50 clicks). Do not click (scroll) more than <input name="fb_limit_show_more_btn" value="199" type="number" min="1" max="5000"> times per post.
+<br><br>
+<label style="display:none;"><input type="checkbox" id="skip_Invite"><span style='color:red'><span style='color:green'><b>DISABLE Invite feature. Use this if you have more than 100 000 likes OR if you want to elaborate only shared posts.</b></span> Extension will NOT invite people, but you can automatically like all shared posts (check the option above).</span></label>
+
+<br>
+<span style="color:green"><b>Do you want to skip some posts?</b></span> Open Publishing Tools tab, there are 25 posts per page. Open the page you need and start the extension there. Do you still need to skip some posts on that page? Put the number here (it is saved just for 1 run) <input name="skip_post_setting" value="0" type="number" min="0" max="25"> (1-24 or any number if you run the script in Photos tab)
+<br><br>
+<span style="color:green"><b>Business Suite scanning update (Oct 2021):</b></span> when we scan in business suite, some pages can't open the post in the current tab (Facebook error) and we scan them by default in a new tab which may not work for you. If you can open list of likers in the current tab - just enable this setting: <label><input type="checkbox" id="scan_current_tab_business_suite">scan posts in the current tab</label>
+<br><br>
+
+<label><input type="checkbox" id="slow_internet"><span style='font-weight: normal;'><span style='color:green'><b>SLOW internet</b></span>. Normally, when you scan more pages or use real time scan, script waits for the page to be loaded for 30 seconds, if the page takes more time to load, the script stops. With this option the timeout is increased to 3 minutes. This option may affect more features that will be added in the future.</span></label>
+<br>
+<label style="display:none;"><input type="checkbox" id="notif_other_tab"><span style='font-weight: normal;'><span style='color:green'><b>Show a notification</b></span> in your current tab/window when script stops in another tab/window and you do not notice that after 15 seconds (DISABLED - now working).</span></label>
+</section>
+
+    <br>
+    <hr>
+    <br>
+<div id="status" style="color:red;font-weight:bold;"></div>
+<button style="padding: 10px 20px;" id="save">Save Settings</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<button style="padding: 10px 20px;" id="reset">Reset to default</button>
+
+
+    
+</main>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div style="display:none;">
+<h2>More advanced settings</h2>
+<p>Those numbers were tested, so it's better to not change them, but you can.
+</p>
+Wait when invite likes' window is loaded before first click (milisconds): <input name="fb_timeout_1" value="4000" type="number" min="1000" max="100000"><br>
+Wait when trying to load more likes for current window (miliseconds): <input name="fb_timeout_2" value="2000" type="number" min="1000" max="100000"><br>
+Wait before opening the next post after it closes the current: <input name="fb_timeout_3" value="1500" type="number" min="1000" max="100000"><br>
+Wait after it scrolls the page to load more posts: <input name="fb_timeout_4" value="7000" type="number" min="1000" max="100000">, after 20 posts we need more timeout as a page is too bigger: <input name="fb_timeout_5" value="10000" type="number" min="1000" max="100000">, after 40 posts we need much more timeout as a page is tooooo bigger: <input name="fb_timeout_6" value="15000" type="number" min="1000" max="100000"><br><br>
+<br>
+* 1000 miliseconds = 1 second. Minimum timeout: 1000 milisec. Max timeout 100 sec.
+</div>
+
+
+<p>
+<br><br><br>
+<b>Important to know:</b>
+<br>1. The extension uses buttons' names to locate them, but <b>sometimes the design of FB and names of buttons are changed</b>. I am regularly updating the extension, <b>if some functionality stops working - write me</b> an email, usually, <b>I update it on the same day</b> :)
+<br>2. When you launch the extension - Chrome tries to update it. <b>If there is a new version - it updates it even if the extension is running.</b> So you may see <b>'undefined'</b> text and clicks are not working. Just reload the page and try again.
+<br>3. <b>Posts with a lot of reactions:</b> extension automatically clicks on 'Load more' buttons, Facebook loads 50 'Invite' buttons at a time, but then start to load fewer buttons, that's why extension takes more time for such posts, but don't worry, everything is automatic ;)
+</p>
+
+
+<script src="options_pro.js"></script>
+</body>
+</html>

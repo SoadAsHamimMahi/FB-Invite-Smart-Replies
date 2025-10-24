@@ -1,0 +1,63 @@
+﻿{
+  "manifest_version": 3,
+  "name": "FB Invite & Smart Replies",
+  "version": "1.0.0",
+  "action": { 
+    "default_popup": "popup.html",
+    "default_title": "FB Invite & Smart Replies" 
+  },
+  "background": { 
+    "service_worker": "background.js" 
+  },
+  "default_locale": "en",
+  "description": "Automate Facebook interactions with smart AI-powered comment replies and liker invitations.", 
+  "homepage_url": "https://your-new-website.com/", 
+  "icons": {
+    "128": "icons/icon128.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png"
+  },
+  "options_page": "options_mul.html", 
+  "permissions": [ "storage", "activeTab", "scripting", "alarms" ],
+  "host_permissions": [
+    "https://*.facebook.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.mistral.ai/*"
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "clipboardWrite"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ 
+        "content.css", 
+        "fonts/roboto-latin-400.woff2", 
+        "fonts/roboto-latin-700.woff2", 
+        "options_mul.html", 
+        "comment_sender.js", 
+        "postTextNow.js",
+        "forceReload.js", 
+        "how-to-select-posts.png",
+        "reply_content.js",
+        "prompt_builder.js",
+        "safety.js",
+        "jquery-3.5.1.min.js",
+        "sendkeys.js",
+        "contentscript.js",
+        "popup.html"
+      ],
+      "matches": [ "https://*.facebook.com/*" ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["sidebar_inject.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

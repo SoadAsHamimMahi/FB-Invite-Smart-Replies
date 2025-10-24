@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Reply Comments - FB Invite & Smart Replies</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #1c1e21;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            color: #1877f2;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .header .active-key {
+            background: #e3f2fd;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #1976d2;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        
+        .section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #1c1e21;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #1c1e21;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #dadde1;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #1877f2;
+            box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .mode-selector {
+            display: flex;
+            background: #f0f2f5;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .mode-option {
+            flex: 1;
+            padding: 10px 16px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+        
+        .mode-option.active {
+            background: white;
+            color: #1877f2;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .mode-option:not(.active) {
+            color: #65676b;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: #1877f2;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #166fe5;
+        }
+        
+        .btn-secondary {
+            background: #42b883;
+            color: white;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #369870;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover:not(:disabled) {
+            background: #e67e22;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .status {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .log-area {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+        
+        .log-entry.error {
+            color: #f48771;
+        }
+        
+        .log-entry.success {
+            color: #4ec9b0;
+        }
+        
+        .log-entry.info {
+            color: #9cdcfe;
+        }
+        
+        .log-entry.warning {
+            color: #dcdcaa;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e4e6ea;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #1877f2;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1877f2;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #65676b;
+            margin-top: 4px;
+        }
+        
+        .preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .preview-content {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .preview-content h3 {
+            margin-bottom: 16px;
+            color: #1c1e21;
+        }
+        
+        .preview-text {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-style: italic;
+            border-left: 4px solid #1877f2;
+        }
+        
+        .preview-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+        /* Midnight Blue Dark Theme */
+        :root[data-theme="dark"]{
+            --primary:#60A5FA; --primary-dark:#3B82F6; --accent:#22D3EE;
+            --bg:#0B1220; --surface:#111827; --surface-2:#0F172A;
+            --text:#E5E7EB; --muted:#9CA3AF; --border:#1F2937;
+            --success:#22C55E; --warning:#F59E0B; --error:#F87171;
+        }
+        :root[data-theme="dark"] body{ background:var(--bg); color:var(--text); }
+        :root[data-theme="dark"] .header,
+        :root[data-theme="dark"] .section{ background:var(--surface); box-shadow:none; }
+        :root[data-theme="dark"] .header h1{ color:var(--primary); }
+        :root[data-theme="dark"] .active-key{ background:rgba(96,165,250,.12); color:var(--primary); }
+        :root[data-theme="dark"] .section h2{ color:var(--text); }
+        :root[data-theme="dark"] .form-control{ background:#0f172a; color:var(--text); border-color:var(--border); }
+        :root[data-theme="dark"] .form-control:focus{ border-color:var(--primary); box-shadow:0 0 0 3px rgba(96,165,250,.2); }
+        :root[data-theme="dark"] .mode-selector{ background:#0f172a; }
+        :root[data-theme="dark"] .mode-option.active{ background:var(--surface); color:var(--primary); box-shadow:none; }
+        :root[data-theme="dark"] .mode-option:not(.active){ color:var(--muted); }
+        :root[data-theme="dark"] .btn-primary{ background:var(--primary); color:#0b1220; }
+        :root[data-theme="dark"] .btn-secondary{ background:var(--accent); color:#0b1220; }
+        :root[data-theme="dark"] .btn-warning{ background:var(--warning); color:#0b1220; }
+        :root[data-theme="dark"] .btn-danger{ background:var(--error); }
+        :root[data-theme="dark"] .status{ background:#0f172a; color:var(--muted); }
+        :root[data-theme="dark"] .status.info{ background:rgba(96,165,250,.12); color:var(--primary); }
+        :root[data-theme="dark"] .progress-bar{ background:#1f2937; }
+        :root[data-theme="dark"] .progress-fill{ background:linear-gradient(90deg,var(--primary),#93c5fd); }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="container">
+        <div class="header">
+            <h1>💬 Smart Reply Comments</h1>
+            <div class="active-key" id="activeKeyDisplay">
+                Loading...
+            </div>
+        </div>
+        
+        <div id="status" class="status info hidden">
+            <span>Ready to start</span>
+        </div>
+        
+        <div class="main-content">
+            <div class="section">
+                <h2>🎛️ Controls</h2>
+                
+                <div class="mode-selector">
+                    <div class="mode-option active" data-mode="preview">
+                        👁️ Preview Mode
+                    </div>
+                    <div class="mode-option" data-mode="auto">
+                        🚀 Auto Reply
+                    </div>
+                </div>
+                
+                <div class="controls-grid">
+                    <div class="form-group">
+                        <label for="tone">Tone</label>
+                        <select id="tone" class="form-control">
+                            <option value="friendly">Friendly</option>
+                            <option value="supportive">Supportive</option>
+                            <option value="promotional">Promotional</option>
+                            <option value="professional">Professional</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="language">Language</label>
+                        <select id="language" class="form-control">
+                            <option value="auto">Auto-detect</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="it">Italian</option>
+                            <option value="ru">Russian</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maxReplyLength">Max Reply Length</label>
+                        <input type="number" id="maxReplyLength" class="form-control" min="50" max="500" value="220">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="relevance">Relevance Filter</label>
+                        <select id="relevance" class="form-control">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="noUrls" checked>
+                            <label for="noUrls">Remove URLs from replies</label>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="profanityFilter" checked>
+                            <label for="profanityFilter">Profanity filter</label>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="replyOncePerUser" checked>
+                            <label for="replyOncePerUser">Reply once per user per post</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <button id="startBtn" class="btn btn-primary">
+                        ▶️ Start
+                    </button>
+                    <button id="pauseBtn" class="btn btn-warning" disabled>
+                        ⏸️ Pause
+                    </button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>
+                        ⏹️ Stop
+                    </button>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📊 Progress & Stats</h2>
+                
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalComments">0</div>
+                        <div class="stat-label">Total Comments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="processedComments">0</div>
+                        <div class="stat-label">Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="repliedComments">0</div>
+                        <div class="stat-label">Replied</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="skippedComments">0</div>
+                        <div class="stat-label">Skipped</div>
+                    </div>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #65676b;">
+                    <span id="progressText">Ready</span>
+                    <span id="etaText"></span>
+                </div>
+                
+                <h3 style="margin-top: 24px; margin-bottom: 12px;">📝 Activity Log</h3>
+                <div class="log-area" id="logArea">
+                    <div class="log-entry info">Ready to start smart replies...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Preview Modal -->
+    <div id="previewModal" class="preview-modal">
+        <div class="preview-content">
+            <h3>💭 Reply Preview</h3>
+            <div class="preview-text" id="previewText">
+                <!-- Preview text will be inserted here -->
+            </div>
+            <div class="preview-actions">
+            <button id="approveBtn" class="btn btn-primary">✅ Approve & Send</button>
+            <button id="copyPreviewReplyBtn" class="btn btn-secondary">📋 Copy</button>
+                <button id="skipBtn" class="btn btn-secondary">⏭️ Skip</button>
+                <button id="cancelPreviewBtn" class="btn btn-danger">❌ Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="reply.js"></script>
+</body>
+</html>

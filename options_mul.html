@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>My Custom Settings</title>
+</head>
+<meta charset="utf-8">
+<style>
+  /* ... (existing CSS remains the same) ... */
+</style>
+
+<body data-theme="dark">
+
+  <h1>My Custom Settings</h1>
+  <main>
+
+    <input id="tab1" type="radio" name="tabs" checked>
+    <label for="tab1">Multi-Page mode</label>
+
+    <input id="tab2" type="radio" name="tabs">
+    <label for="tab2">Random Time Settings</label>
+
+    <input id="tab3" type="radio" name="tabs">
+    <label for="tab3">Invite Filters</label>
+
+    <input id="tab4" type="radio" name="tabs">
+    <label for="tab4">Shared posts</label>
+
+    <input id="tab5" type="radio" name="tabs">
+    <label for="tab5">Daily limit & other</label>
+
+    <input id="tab6" type="radio" name="tabs">
+    <label for="tab6">Comment Actions</label>
+
+    <input id="tab7" type="radio" name="tabs">
+    <label for="tab7">Group Tools</label>
+
+     
+    <section id="content1">
+    </section>
+     
+    <section id="content2">
+    </section>
+       
+    <section id="content3">
+    </section>
+     
+    <section id="content4">
+    </section>
+       
+    <section id="content5">
+    </section>
+
+    <section id="content6">
+      <h2>Comment Interaction Settings</h2>
+      <p>
+        <label><input type="checkbox" id="like_comments">Automatically like comments on posts.</label>
+        <br>
+        <label><input type="checkbox" id="invite_comment_likers">Automatically invite likers of comments to like your
+          page.</label>
+        <br>
+      </p>
+    </section>
+
+    <section id="content7">
+      <h2>Group Management Tools</h2>
+      <p>
+        Please specify which group tools you need. Examples include:
+      <ul>
+        <li>Approve pending members automatically.</li>
+        <li>Remove members who violate rules.</li>
+        <li>Approve/decline pending posts.</li>
+      </ul>
+      (Implementation for these will be added after clarification.)
+      </p>
+    </section>
+
+        <br>
+       
+    <hr>
+        <br>
+    <div id="status" style="color:red;font-weight:bold;"></div>
+    <button style="padding: 10px 20px;" id="save">Save Settings</button>              
+    <button
+      style="padding: 10px 20px;" id="reset">Reset to default</button>
+
+    
+      
+  </main>
+
+  <p>
+    <br><br><br>
+    <b>Additional info:</b>
+    <br>1. This tool uses Facebook's button names and UI elements to function. Facebook regularly updates its design,
+    which may cause features to stop working. If something breaks, please report it to your support channel (or modify
+    the code yourself if you're able).
+    <br>2. When you launch the extension, Chrome might try to update it. If a new version of *your* extension is
+    available, it will update. If you notice unexpected behavior, try reloading the Facebook page.
+    <br>3. **Full scan or Real time functions stops unexpectedly?** If running on multiple PCs with Chrome Sync enabled,
+    ensure consistent settings to avoid conflicts.
+    <br>4. **Posts with a lot of reactions:** This extension automatically clicks 'Load more' buttons. Facebook may
+    limit the number of reactions loaded to preserve server performance. We suggest you run the script every X days to
+    process new reactions.
+  </p>
+
+
+  <script src="options_mul.js"></script>
+</body>
+
+</html>

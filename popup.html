@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FB Invite & Smart Replies</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 400px;
+            height: 600px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+        
+        .container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding: 16px;
+            background: white;
+            border-bottom: 1px solid #e4e6ea;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            color: #1877f2;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .header p {
+            font-size: 12px;
+            color: #65676b;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e4e6ea;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            color: #65676b;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .nav-tab.active {
+            color: #1877f2;
+            background: #f0f2f5;
+        }
+        
+        .nav-tab:hover:not(.active) {
+            background: #f8f9fa;
+        }
+        
+        .tab-icon {
+            font-size: 16px;
+        }
+        
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .status {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        /* Invite Tab Styles */
+        .invite-controls {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .invite-button {
+            width: 100%;
+            padding: 12px;
+            background: #1877f2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        
+        .invite-button:hover {
+            background: #166fe5;
+        }
+        
+        .invite-button:disabled {
+            background: #bcc0c4;
+            cursor: not-allowed;
+        }
+        
+        /* Reply Tab Styles */
+        .reply-controls {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #1c1e21;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #dadde1;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #1877f2;
+            box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.1);
+        }
+        
+        .mode-selector {
+            display: flex;
+            background: #f0f2f5;
+            border-radius: 6px;
+            padding: 2px;
+            margin-bottom: 12px;
+        }
+        
+        .mode-option {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .mode-option.active {
+            background: white;
+            color: #1877f2;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .mode-option:not(.active) {
+            color: #65676b;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .checkbox-group label {
+            margin: 0;
+            font-size: 11px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .btn-primary {
+            background: #1877f2;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #166fe5;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover:not(:disabled) {
+            background: #e67e22;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1877f2;
+        }
+        
+        .stat-label {
+            font-size: 10px;
+            color: #65676b;
+            margin-top: 2px;
+        }
+        
+        .log-area {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        
+        .log-entry {
+            margin-bottom: 4px;
+        }
+        
+        .log-entry.error {
+            color: #f48771;
+        }
+        
+        .log-entry.success {
+            color: #4ec9b0;
+        }
+        
+        .log-entry.info {
+            color: #9cdcfe;
+        }
+        
+        /* Settings Tab Styles */
+        .settings-section {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .settings-section h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #1c1e21;
+        }
+        
+        .key-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+        
+        .key-info {
+            flex: 1;
+        }
+        
+        .key-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #1c1e21;
+        }
+        
+        .key-provider {
+            font-size: 10px;
+            color: #65676b;
+        }
+        
+        .key-active {
+            font-size: 10px;
+            color: #42b883;
+            margin-left: 8px;
+        }
+        
+        .key-actions {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 10px;
+        }
+        
+        .add-key-form {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .fallback-notice {
+            background: #fff3cd;
+            color: #856404;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 8px;
+            border: 1px solid #ffeaa7;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .fallback-notice.hidden {
+            display: none !important;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e4e6ea;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #1877f2;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e4e6ea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #1c1e21;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #65676b;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            color: #1c1e21;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .reply-preview {
+            margin-bottom: 20px;
+        }
+        
+        .reply-text {
+            background: #f8f9fa;
+            border: 1px solid #e4e6ea;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            min-height: 60px;
+            word-wrap: break-word;
+        }
+        
+        .reply-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .reply-actions .btn {
+            flex: 1;
+            max-width: 120px;
+        }
+        
+        /* Comments List Styles */
+        .comments-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e4e6ea;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        
+        .comment-item {
+            padding: 12px;
+            border-bottom: 1px solid #e4e6ea;
+            background: white;
+            transition: background 0.2s ease;
+        }
+        
+        .comment-item:hover {
+            background: #f0f2f5;
+        }
+        
+        .comment-item:last-child {
+            border-bottom: none;
+        }
+        
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .comment-user {
+            font-weight: 600;
+            color: #1877f2;
+            font-size: 12px;
+        }
+        
+        .comment-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .comment-text {
+            font-size: 11px;
+            color: #1c1e21;
+            line-height: 1.4;
+            margin-bottom: 8px;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        
+        .comment-meta {
+            font-size: 10px;
+            color: #65676b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .btn-tiny {
+            padding: 4px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+            min-width: auto;
+        }
+        
+        .no-comments {
+            padding: 20px;
+            text-align: center;
+            color: #65676b;
+        }
+        
+        .comment-loading {
+            padding: 12px;
+            text-align: center;
+            color: #65676b;
+            font-size: 12px;
+        }
+        
+        .comment-generated {
+            background: #e8f5e8;
+            border-left: 3px solid #42b883;
+        }
+        
+        .comment-generated .comment-text {
+            color: #2e7d32;
+            font-weight: 500;
+        }
+        
+        .comment-reply {
+            background: #e3f2fd;
+            border-left: 3px solid #1877f2;
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #1976d2;
+            font-weight: 500;
+        }
+        
+        /* Batch Generation Styles */
+        .batch-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .btn-large {
+            font-size: 14px;
+            padding: 10px 16px;
+            font-weight: 600;
+        }
+        
+        .batch-progress {
+            background: #f8f9fa;
+            border: 1px solid #e4e6ea;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .batch-progress.hidden {
+            display: none;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e4e6ea;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1877f2, #42a5f5);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        .btn-small {
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+        
+        /* Comment Card Styles */
+        .comment-card {
+            background: white;
+            border: 1px solid #e4e6ea;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            padding: 12px;
+            transition: all 0.2s ease;
+            animation: fadeInUp 0.3s ease;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .comment-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .user-icon {
+            font-size: 16px;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: #1877f2;
+            font-size: 13px;
+        }
+        
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-completed {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status-generating {
+            background: #fff3cd;
+            color: #856404;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-pending {
+            background: #f5f5f5;
+            color: #757575;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .card-actions {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .btn-icon {
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+        
+        .btn-icon:hover {
+            background: #f0f0f0;
+        }
+        
+        .comment-section, .reply-section {
+            margin-bottom: 12px;
+        }
+        
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #65676b;
+            margin-bottom: 6px;
+        }
+        
+        .comment-text, .reply-text {
+            background: #f8f9fa;
+            border: 1px solid #e4e6ea;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 100px;
+            overflow-y: auto;
+            word-wrap: break-word;
+        }
+        
+        .reply-text {
+            font-size: 13px;
+            min-height: 40px;
+        }
+        
+        .reply-text[contenteditable="true"] {
+            outline: none;
+            border-color: #1877f2;
+            box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2);
+        }
+        
+        .reply-completed {
+            background: #e8f5e8 !important;
+            border-color: #4caf50 !important;
+        }
+        
+        .reply-generating {
+            background: #fff3cd !important;
+            border-color: #ffc107 !important;
+        }
+        
+        .reply-error {
+            background: #ffebee !important;
+            border-color: #f44336 !important;
+        }
+        
+        .reply-pending {
+            background: #f5f5f5 !important;
+            border-color: #9e9e9e !important;
+        }
+        
+        .reply-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #757575;
+            margin-top: 4px;
+        }
+        
+        .card-footer {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .card-footer .btn {
+            font-size: 11px;
+            padding: 6px 10px;
+        }
+        
+        .bulk-actions {
+            background: #f8f9fa;
+            border: 1px solid #e4e6ea;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .bulk-actions.hidden {
+            display: none;
+        }
+        
+        .bulk-actions .btn {
+            font-size: 11px;
+            padding: 8px 12px;
+        }
+        
+        /* Collapsible Sections */
+        .section-collapsible {
+            margin-bottom: 12px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+        }
+        
+        .section-header:hover {
+            background: #e9ecef;
+        }
+        
+        .section-header h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1877f2;
+        }
+        
+        .collapse-btn {
+            background: none;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            color: #65676b;
+            padding: 4px;
+            border-radius: 3px;
+        }
+        
+        .collapse-btn:hover {
+            background: #dee2e6;
+        }
+        
+        .section-content {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .section-content.collapsed {
+            display: none;
+        }
+        
+        .section-header.collapsed .collapse-btn {
+            transform: rotate(-90deg);
+        }
+        
+        /* Improved Reply Tab Layout */
+        /* IMPORTANT: Scope flex layout only to the reply tab when it's ACTIVE to avoid forcing
+           all tab contents to display as flex (which breaks tab hiding). */
+        #reply-tab.tab-content.active {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Safety guards: prevent reply content from appearing in other tabs */
+        #settings-tab .section-collapsible { display: none !important; }
+        #invite-tab .section-collapsible { display: none !important; }
+        #invite-tab .reply-controls { display: none !important; }
+        #settings-tab .reply-controls { display: none !important; }
+        #invite-tab .comments-list { display: none !important; }
+        #settings-tab .comments-list { display: none !important; }
+        #invite-tab .bulk-actions { display: none !important; }
+        #settings-tab .bulk-actions { display: none !important; }
+        
+        /* Model Cards Styles */
+        .models-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .model-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 2px solid #e4e6ea;
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .model-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .model-card.primary {
+            border-color: #1877f2;
+            background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+        }
+        
+        .model-card.primary:hover {
+            box-shadow: 0 4px 12px rgba(24, 119, 242, 0.2);
+        }
+        
+        .model-card.secondary {
+            border-color: #42b883;
+            background: linear-gradient(135deg, #e8f5e8 0%, #ffffff 100%);
+        }
+        
+        .model-card.secondary:hover {
+            box-shadow: 0 4px 12px rgba(66, 184, 131, 0.2);
+        }
+        
+        .model-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .model-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .model-badge.primary {
+            background: #1877f2;
+            color: white;
+        }
+        
+        .model-badge.secondary {
+            background: #42b883;
+            color: white;
+        }
+        
+        .model-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+        }
+        
+        .status-indicator {
+            font-size: 12px;
+            color: #65676b;
+        }
+        
+        .status-indicator.connected {
+            color: #42b883;
+        }
+        
+        .status-indicator.error {
+            color: #dc3545;
+        }
+        
+        .status-indicator.testing {
+            color: #f39c12;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .model-card-content {
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .empty-model {
+            text-align: center;
+            color: #65676b;
+        }
+        
+        .empty-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .empty-text {
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .model-info {
+            text-align: left;
+            width: 100%;
+        }
+        
+        .model-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1c1e21;
+            margin-bottom: 4px;
+        }
+        
+        .model-provider {
+            font-size: 12px;
+            color: #65676b;
+            margin-bottom: 4px;
+        }
+        
+        .model-features {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .feature-tag {
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #f0f2f5;
+            color: #65676b;
+        }
+        
+        .feature-tag.vision {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .model-card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            justify-content: center;
+        }
+        
+        .model-switch-control {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .switch-button {
+            background: linear-gradient(135deg, #1877f2, #42b883);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .switch-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(24, 119, 242, 0.3);
+        }
+        
+        .switch-arrow {
+            font-size: 14px;
+            animation: bounce 2s infinite;
+        }
+        
+        .switch-text {
+            font-size: 11px;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-3px); }
+            60% { transform: translateY(-2px); }
+        }
+        
+        /* Provider-specific styling */
+        .model-card.gemini {
+            border-left: 4px solid #4285f4;
+        }
+        
+        .model-card.mistral {
+            border-left: 4px solid #ff6b35;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 400px) {
+            .model-card-actions {
+                flex-direction: column;
+            }
+            
+            .model-card-actions .btn {
+                width: 100%;
+            }
+        }
+        
+        .comments-list {
+            /* Give the Generate All section its own scroll area */
+            overflow-y: auto;
+            max-height: 380px; /* ensure inner scrolling so bottom comments are reachable */
+            min-height: 200px;
+            border: 1px solid #e4e6ea;
+            border-radius: 6px;
+            background: white;
+        }
+        
+        .reply-controls {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 400px) {
+            .batch-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .batch-controls .btn {
+                width: 100%;
+                margin-bottom: 4px;
+            }
+            
+            .bulk-actions {
+                flex-direction: column;
+            }
+            
+            .bulk-actions .btn {
+                width: 100%;
+            }
+        }
+        /* Midnight Blue Dark Theme */
+        :root[data-theme="dark"]{
+            --primary:#60A5FA; --primary-dark:#3B82F6; --accent:#22D3EE;
+            --bg:#0B1220; --surface:#111827; --surface-2:#0F172A;
+            --text:#E5E7EB; --muted:#9CA3AF; --border:#1F2937;
+            --success:#22C55E; --warning:#F59E0B; --error:#F87171;
+        }
+
+        /* Core surfaces */
+        :root[data-theme="dark"] body{ background:var(--bg); color:var(--text); }
+        :root[data-theme="dark"] .header,
+        :root[data-theme="dark"] .reply-controls,
+        :root[data-theme="dark"] .invite-controls,
+        :root[data-theme="dark"] .settings-section,
+        :root[data-theme="dark"] .comment-card,
+        :root[data-theme="dark"] .modal-content{ background:var(--surface); border-color:var(--border); box-shadow:none; }
+
+        /* Tabs */
+        :root[data-theme="dark"] .nav-tabs{ background:var(--surface-2); border-color:var(--border); }
+        :root[data-theme="dark"] .nav-tab{ color:var(--muted); }
+        :root[data-theme="dark"] .nav-tab.active{ color:var(--primary); background:#0f172a; }
+
+        /* Text accents */
+        :root[data-theme="dark"] .header h1{ color:var(--primary); }
+        :root[data-theme="dark"] .header p{ color:var(--muted); }
+
+        /* Inputs */
+        :root[data-theme="dark"] .form-control{ background:#0f172a; color:var(--text); border-color:var(--border); }
+        :root[data-theme="dark"] .form-control:focus{ border-color:var(--primary); box-shadow:0 0 0 2px rgba(96,165,250,.25); }
+        :root[data-theme="dark"] label{ color:var(--text); }
+
+        /* Buttons */
+        :root[data-theme="dark"] .btn-primary{ background:var(--primary); color:#0b1220; }
+        :root[data-theme="dark"] .btn-primary:hover{ background:var(--primary-dark); }
+        :root[data-theme="dark"] .btn-warning{ background:var(--warning); color:#0b1220; }
+        :root[data-theme="dark"] .btn-danger{ background:var(--error); }
+
+        /* Status chips */
+        :root[data-theme="dark"] .status.success{ background:rgba(34,197,94,.12); color:var(--success); }
+        :root[data-theme="dark"] .status.info{ background:rgba(96,165,250,.12); color:var(--primary); }
+        :root[data-theme="dark"] .status.error{ background:rgba(248,113,113,.12); color:var(--error); }
+
+        /* Lists/borders */
+        :root[data-theme="dark"] .comments-list{ background:#0f172a; border-color:var(--border); }
+        :root[data-theme="dark"] .comment-item{ background:transparent; border-bottom:1px solid var(--border); }
+        :root[data-theme="dark"] .comment-item:hover{ background:rgba(148,163,184,.06); }
+        :root[data-theme="dark"] .bulk-actions{ background:#0f172a; border-color:var(--border); }
+        :root[data-theme="dark"] .section-header{ background:#0f172a; border:1px solid var(--border); }
+        :root[data-theme="dark"] .section-header:hover{ background:#111827; }
+
+        /* Progress */
+        :root[data-theme="dark"] .progress-bar{ background:#1f2937; }
+        :root[data-theme="dark"] .progress-fill{ background:linear-gradient(90deg,var(--primary),#93c5fd); }
+
+        /* Status badges */
+        :root[data-theme="dark"] .status-badge.status-completed{ background:rgba(34,197,94,.12); color:var(--success); }
+        :root[data-theme="dark"] .status-badge.status-generating{ background:rgba(245,158,11,.12); color:var(--warning); }
+        :root[data-theme="dark"] .status-badge.status-error{ background:rgba(248,113,113,.12); color:var(--error); }
+        :root[data-theme="dark"] .status-badge.status-pending{ background:#1f2937; color:#9ca3af; }
+
+        /* Scrollbar */
+        :root[data-theme="dark"] *::-webkit-scrollbar{ width:10px; }
+        :root[data-theme="dark"] *::-webkit-scrollbar-thumb{ background:#1f2937; border-radius:8px; }
+        :root[data-theme="dark"] *::-webkit-scrollbar-thumb:hover{ background:#334155; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FB Invite & Smart Replies</h1>
+            <p>Automate your Facebook engagement</p>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="invite">
+                <span class="tab-icon">👥</span>
+                <span>Invite</span>
+            </button>
+            <button class="nav-tab" data-tab="reply">
+                <span class="tab-icon">💬</span>
+                <span>Reply</span>
+            </button>
+            <button class="nav-tab" data-tab="settings">
+                <span class="tab-icon">⚙️</span>
+                <span>Settings</span>
+            </button>
+        </div>
+        
+        <div class="content">
+            <div id="status" class="status hidden"></div>
+            
+            <!-- Invite Tab -->
+            <div id="invite-tab" class="tab-content active">
+                <div class="invite-controls">
+                    <h3>Invite Settings</h3>
+                    
+                    <!-- Pause between invites -->
+                    <div class="form-group">
+                        <label>⏱️ Pause between invites</label>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <select id="pauseMin" class="form-control" style="width: 60px;">
+                                <option value="2">2</option>
+                                <option value="3" selected>3</option>
+                                <option value="4">4</option>
+                                <option value="8">8</option>
+                                <option value="13">13</option>
+                                <option value="18">18</option>
+                                <option value="30">30</option>
+                                <option value="50">50</option>
+                                <option value="80">80</option>
+                                <option value="150">150</option>
+                                <option value="180">180</option>
+                            </select>
+                            <span>-</span>
+                            <select id="pauseMax" class="form-control" style="width: 60px;">
+                                <option value="2.5">2.5</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5" selected>5</option>
+                                <option value="7">7</option>
+                                <option value="8">8</option>
+                                <option value="10">10</option>
+                                <option value="15">15</option>
+                                <option value="22">22</option>
+                                <option value="35">35</option>
+                                <option value="55">55</option>
+                                <option value="75">75</option>
+                                <option value="90">90</option>
+                                <option value="150">150</option>
+                                <option value="180">180</option>
+                            </select>
+                            <span>seconds</span>
+                        </div>
+                    </div>
+
+                    <!-- Stop after invites -->
+                    <div class="form-group">
+                        <label>🛑 Stop after</label>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <input type="number" id="inviteLimit" class="form-control" value="490" min="1" max="5000" style="width: 80px;">
+                            <span>invites</span>
+                            <select id="stopWhen" class="form-control" style="width: 60px;">
+                                <option value="run" selected>per run</option>
+                                <option value="day">per day</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Fast scan option -->
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="fastScan">
+                        <label for="fastScan">⚡ Fast scan: skip the post if 0 people were invited after</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-left: 20px; margin-bottom: 8px;">
+                        <input type="number" id="fastScanLoads" class="form-control" value="4" min="1" max="20" style="width: 50px;">
+                        <span>scrolls of the likers' list.</span>
+                    </div>
+
+                    <!-- Save elaborated posts -->
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="saveElaboratedPosts">
+                        <label for="saveElaboratedPosts">💾 Save elaborated posts and ignore on next runs (in some tabs only).</label>
+                    </div>
+                    <div style="margin-left: 20px; margin-bottom: 8px; font-size: 11px; color: #65676b;">
+                        Saved posts: <span id="savedPostsCount">0</span>. <a href="#" id="resetSavedPosts" style="color: #1877f2;">Reset.</a>
+                    </div>
+
+                    <!-- RAM optimization -->
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="saveRam">
+                        <label for="saveRam">🧠 <span style="color: red;">NEW for BIG POSTS: SAVE RAM</span> - release elaborated likers from the ram etc.</label>
+                    </div>
+
+                    <!-- Main invite options -->
+                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e4e6ea;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="mainInviteOption" checked>
+                            <label for="mainInviteOption">✅ <span style="color: red;">MAIN option</span>: invite post likers to like your page.</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="likeSharedPosts">
+                            <label for="likeSharedPosts">👍 Like shared posts.</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="likeCommentsOnShared">
+                            <label for="likeCommentsOnShared">💬 Like comments on shared posts.</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="inviteSharedLikers">
+                            <label for="inviteSharedLikers">👥 Invite likers of shared posts (only shared by your page).</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="inviteCommentLikers">
+                            <label for="inviteCommentLikers">🎯 Invite who liked comments posted by you on shared posts.</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="invite-controls">
+                    <h3>Invite Likers to Your Page</h3>
+                    <p style="font-size: 11px; color: #65676b; margin-bottom: 12px;">
+                        Automatically invite people who liked your posts to like your Facebook page.
+                    </p>
+                    <button id="startInvite" class="invite-button">
+                        ▶️ Start Inviting Likers
+                    </button>
+                </div>
+                
+                <div class="invite-controls">
+                    <h3>Current Status</h3>
+                    <div id="inviteStatus" style="font-size: 12px; color: #65676b;">
+                        Ready to start inviting
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reply Tab -->
+            <div id="reply-tab" class="tab-content">
+                <!-- Fallback Indicator -->
+                <div id="fallbackIndicator" class="fallback-notice hidden">
+                    ⚠️ Using backup model (Primary model unavailable)
+                </div>
+                
+                <!-- Post Data Section (Collapsible) -->
+                <div class="section-collapsible">
+                    <div class="section-header" data-toggle="post-data-section">
+                        <h3>📝 Post Data</h3>
+                        <button class="collapse-btn">▼</button>
+                    </div>
+                    <div id="post-data-section" class="section-content">
+                        <div class="reply-controls">
+                            <div id="replyStatus" class="status info" style="margin-bottom: 12px;">
+                                Loading AI configuration...
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="postCaption">📄 Post Caption</label>
+                                <textarea id="postCaption" class="form-control" rows="3" placeholder="Enter the Facebook post caption here..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="postImage">🖼️ Post Image URL (Optional)</label>
+                                <input type="url" id="postImage" class="form-control" placeholder="https://example.com/image.jpg">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="tone">🎭 Reply Tone</label>
+                                    <select id="tone" class="form-control">
+                                        <option value="friendly">😊 Friendly</option>
+                                        <option value="funny">😂 Funny/Humorous</option>
+                                        <option value="professional">👔 Professional</option>
+                                        <option value="casual">😎 Casual</option>
+                                        <option value="enthusiastic">🎉 Enthusiastic</option>
+                                        <option value="supportive">🤗 Supportive</option>
+                                        <option value="empathetic">❤️ Empathetic</option>
+                                        <option value="promotional">📢 Promotional</option>
+                                        <option value="educational">📚 Educational</option>
+                                        <option value="appreciative">🙏 Appreciative</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="language">🌍 Language</label>
+                                    <select id="language" class="form-control">
+                                        <option value="auto">Auto-detect</option>
+                                        <option value="en">English</option>
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="maxReplyLength">📏 Max Reply Length</label>
+                                <input type="number" id="maxReplyLength" class="form-control" value="220" min="50" max="500">
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="noUrls" checked>
+                                <label for="noUrls">🚫 Remove URLs</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="profanityFilter" checked>
+                                <label for="profanityFilter">🛡️ Profanity filter</label>
+                            </div>
+                            
+                            <div style="margin-top: 12px;">
+                                <button id="savePostData" class="btn btn-primary">💾 Save Post Data</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Smart Comment Detection Section (Always Visible) -->
+                <div class="section-collapsible">
+                    <div class="section-header" data-toggle="smart-comments-section">
+                        <h3>💬 Smart Comment Detection</h3>
+                        <button class="collapse-btn">▼</button>
+                    </div>
+                    <div id="smart-comments-section" class="section-content">
+                        <div class="reply-controls">
+                            <div class="batch-controls" style="margin-bottom: 12px;">
+                                <button id="scanComments" class="btn btn-primary" disabled>🔍 Scan Comments</button>
+                                <button id="refreshComments" class="btn btn-warning" disabled>🔄 Refresh</button>
+                                <button id="generateAllBtn" class="btn btn-primary btn-large" disabled>
+                                    ✨ Generate All Replies (<span id="commentCount">0</span>)
+                                </button>
+                                <div id="scanStatus" class="status info" style="margin-top: 8px; display: none;">
+                                    Scanning for comments...
+                                </div>
+                            </div>
+                            
+                            <!-- Progress Indicator -->
+                            <div id="batchProgress" class="batch-progress hidden">
+                                <div class="progress-text">
+                                    <span id="progressStatus">Generating 1 of 5 replies...</span>
+                                    <span id="progressETA">Est. 20s remaining</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <button id="cancelBatchBtn" class="btn btn-danger btn-small">Cancel</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Comments List Container (Scrollable) -->
+                        <div id="commentsList" class="comments-list">
+                            <div class="no-comments">
+                                <div class="status info">
+                                    <strong>Instructions:</strong><br>
+                                    1. Fill in the post caption above<br>
+                                    2. Click "Save Post Data"<br>
+                                    3. Navigate to a Facebook post with comments<br>
+                                    4. Click "Scan Comments" to detect comments<br>
+                                    5. Click "Generate All Replies" or individual "Generate" buttons
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bulk Actions Footer -->
+                        <div id="bulkActions" class="bulk-actions hidden">
+                            <button id="copyAllBtn" class="btn btn-primary">📋 Copy All Replies</button>
+                            <button id="exportBtn" class="btn btn-secondary">💾 Export to File</button>
+                            <button id="regenAllBtn" class="btn btn-warning">↻ Regenerate All</button>
+                            <button id="clearAllBtn" class="btn btn-danger">🗑️ Clear All</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Manual Comment Input Section (Collapsible) -->
+                <div class="section-collapsible">
+                    <div class="section-header collapsed" data-toggle="manual-input-section">
+                        <h3>📝 Manual Comment Input (Fallback)</h3>
+                        <button class="collapse-btn">▶</button>
+                    </div>
+                    <div id="manual-input-section" class="section-content collapsed">
+                        <div class="reply-controls">
+                            <div class="form-group">
+                                <label for="selectedComment">Comment Text</label>
+                                <textarea id="selectedComment" class="form-control" rows="2" placeholder="Or manually enter comment text here..."></textarea>
+                            </div>
+                            
+                            <div style="margin-top: 12px;">
+                                <button id="generateReply" class="btn btn-primary" disabled>✨ Generate Reply</button>
+                                <button id="clearComment" class="btn btn-danger">🗑️ Clear</button>
+                            </div>
+                            
+                            <div style="margin-top: 12px;">
+                                <div class="status info">
+                                    <strong>⌨️ Keyboard Shortcuts:</strong><br>
+                                    <strong>Ctrl+S:</strong> Save Post Data<br>
+                                    <strong>Ctrl+R:</strong> Refresh Comments<br>
+                                    <strong>Ctrl+Enter:</strong> Generate Reply<br>
+                                    <strong>1-9:</strong> Generate for comment 1-9<br>
+                                    <strong>Escape:</strong> Close popup
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <div class="settings-section">
+                    <h3>🤖 AI Model Configuration</h3>
+                    
+                    <!-- Model Cards Container -->
+                    <div id="modelsContainer" class="models-container">
+                        <!-- Primary Model Card -->
+                        <div id="primaryModelCard" class="model-card primary">
+                            <div class="model-card-header">
+                                <div class="model-badge primary">PRIMARY</div>
+                                <div class="model-status">
+                                    <span class="status-indicator" id="primaryStatusIndicator">●</span>
+                                    <span id="primaryStatusText">Not configured</span>
+                                </div>
+                            </div>
+                            <div class="model-card-content" id="primaryModelContent">
+                                <div class="empty-model">
+                                    <div class="empty-icon">🤖</div>
+                                    <div class="empty-text">No primary model</div>
+                                    <button class="btn btn-primary btn-small" data-action="add-model" data-slot="primary">
+                                        Configure Primary Model
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="model-card-actions" id="primaryModelActions" style="display: none;">
+                                <button class="btn btn-small btn-secondary" data-action="edit-model" data-slot="primary">✏️ Edit</button>
+                                <button class="btn btn-small btn-secondary" data-action="test-model" data-slot="primary">🔗 Test</button>
+                                <button class="btn btn-small btn-danger" data-action="remove-model" data-slot="primary">🗑️ Remove</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Switch Control -->
+                        <div class="model-switch-control" id="modelSwitchControl" style="display: none;">
+                            <div class="switch-button" data-action="switch-models">
+                                <div class="switch-arrow">⇄</div>
+                                <div class="switch-text">Switch</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Secondary Model Card -->
+                        <div id="secondaryModelCard" class="model-card secondary">
+                            <div class="model-card-header">
+                                <div class="model-badge secondary">SECONDARY</div>
+                                <div class="model-status">
+                                    <span class="status-indicator" id="secondaryStatusIndicator">●</span>
+                                    <span id="secondaryStatusText">Not configured</span>
+                                </div>
+                            </div>
+                            <div class="model-card-content" id="secondaryModelContent">
+                                <div class="empty-model">
+                                    <div class="empty-icon">🔄</div>
+                                    <div class="empty-text">No secondary model</div>
+                                    <button class="btn btn-primary btn-small" data-action="add-model" data-slot="secondary">
+                                        Add Secondary Model
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="model-card-actions" id="secondaryModelActions" style="display: none;">
+                                <button class="btn btn-small btn-secondary" data-action="edit-model" data-slot="secondary">✏️ Edit</button>
+                                <button class="btn btn-small btn-secondary" data-action="test-model" data-slot="secondary">🔗 Test</button>
+                                <button class="btn btn-small btn-danger" data-action="remove-model" data-slot="secondary">🗑️ Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Add/Edit Model Form -->
+                <div id="addKeyForm" class="add-key-form hidden">
+                    <h4 style="font-size: 12px; margin-bottom: 8px;" id="formTitle">Add New API Key</h4>
+                    <div class="form-group">
+                        <label for="keyLabel">Label</label>
+                        <input type="text" id="keyLabel" class="form-control" placeholder="e.g., Gemini Vision Pro">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="keyProvider">Provider</label>
+                            <select id="keyProvider" class="form-control">
+                                <option value="gemini">Gemini</option>
+                                <option value="mistral">Mistral</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="keyModel">Model</label>
+                            <select id="keyModel" class="form-control">
+                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                <option value="mistral-large-2407">Mistral Large</option>
+                                <option value="open-mixtral-8x7b">Mistral Mixtral 8x7B</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="keyApiKey">API Key</label>
+                        <input type="password" id="keyApiKey" class="form-control" placeholder="Enter your API key">
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="keyVision">
+                        <label for="keyVision">Supports Vision</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="keySlot">Assign to Slot</label>
+                        <select id="keySlot" class="form-control">
+                            <option value="primary">Primary Model (Active)</option>
+                            <option value="secondary">Secondary Model (Backup)</option>
+                        </select>
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <button id="saveKeyBtn" class="btn btn-primary btn-small">Save</button>
+                        <button id="cancelKeyBtn" class="btn btn-danger btn-small">Cancel</button>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>⚙️ Default Settings</h3>
+                    <div class="form-group">
+                        <label for="defaultTone">Default Tone</label>
+                        <select id="defaultTone" class="form-control">
+                            <option value="friendly">Friendly</option>
+                            <option value="supportive">Supportive</option>
+                            <option value="promotional">Promotional</option>
+                            <option value="professional">Professional</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="minDelay">Min Delay (sec)</label>
+                            <input type="number" id="minDelay" class="form-control" value="9" min="5" max="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="maxDelay">Max Delay (sec)</label>
+                            <input type="number" id="maxDelay" class="form-control" value="17" min="10" max="120">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="dailyCap">Daily Reply Cap</label>
+                        <input type="number" id="dailyCap" class="form-control" value="120" min="10" max="500">
+                    </div>
+                    <button id="saveSettingsBtn" class="btn btn-primary btn-small">💾 Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reply Generation Popup Modal -->
+    <div id="replyModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✨ Generated Reply</h3>
+                <button id="closeModal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="reply-preview">
+                    <div class="reply-text" id="generatedReplyText">Generating reply...</div>
+                </div>
+                <div class="reply-actions">
+                    <button id="regenerateReply" class="btn btn-warning">🔄 Regenerate</button>
+                    <button id="copyReply" class="btn btn-primary">📋 Copy</button>
+                    <button id="cancelReply" class="btn btn-danger">❌ Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>

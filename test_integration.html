@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .test-result.pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-result.fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Extension Integration Test</h1>
+    <p>This page helps verify that the Chrome extension is working correctly.</p>
+    
+    <div class="test-section">
+        <h2>📋 Test Checklist</h2>
+        <div id="testResults">
+            <div class="test-result info">Running tests...</div>
+        </div>
+        <button onclick="runTests()">🔄 Run Tests</button>
+        <button onclick="clearResults()">🗑️ Clear Results</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔧 Manual Tests</h2>
+        <h3>1. Popup Interface</h3>
+        <ul>
+            <li>Click the extension icon in Chrome toolbar</li>
+            <li>Verify popup opens with 3 tabs: Invite, Reply, Settings</li>
+            <li>Check that all tabs switch correctly</li>
+        </ul>
+        
+        <h3>2. Settings Tab</h3>
+        <ul>
+            <li>Click "Add Key" button</li>
+            <li>Fill in API key details (use test values)</li>
+            <li>Verify key appears in the list</li>
+            <li>Test delete functionality</li>
+        </ul>
+        
+        <h3>3. Reply Tab</h3>
+        <ul>
+            <li>Switch to Reply tab</li>
+            <li>Verify it shows "No active AI key configured" initially</li>
+            <li>After adding a key, verify it shows the active key</li>
+            <li>Test mode switching (Preview/Auto)</li>
+            <li>Verify all form controls work</li>
+        </ul>
+        
+        <h3>4. Invite Tab</h3>
+        <ul>
+            <li>Navigate to a Facebook page</li>
+            <li>Click "Start Inviting Likers"</li>
+            <li>Verify the process starts (should show status)</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>🐛 Common Issues & Solutions</h2>
+        
+        <h3>Issue: "API keys not showing"</h3>
+        <div class="code-block">Solution: 
+1. Make sure you're in the Settings tab
+2. Click "Add Key" and fill all required fields
+3. Check browser console for errors
+4. Verify chrome.storage.sync permissions</div>
+        
+        <h3>Issue: "Buttons opening new tabs"</h3>
+        <div class="code-block">Solution:
+1. Ensure you're using the new popup.html (not the old version)
+2. Check that popup.js is the integrated version
+3. Verify manifest.json has correct popup configuration</div>
+        
+        <h3>Issue: "Extension not working on Facebook"</h3>
+        <div class="code-block">Solution:
+1. Make sure you're on facebook.com domain
+2. Check that manifest.json has correct host_permissions
+3. Verify content scripts are injected properly
+4. Check browser console for permission errors</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📊 Test Results</h2>
+        <div id="testOutput">
+            <p>Click "Run Tests" to check extension functionality.</p>
+        </div>
+    </div>
+
+    <script>
+        function runTests() {
+            const results = document.getElementById('testResults');
+            const output = document.getElementById('testOutput');
+            
+            results.innerHTML = '';
+            output.innerHTML = '<p>Running tests...</p>';
+            
+            const tests = [
+                {
+                    name: 'Chrome Extension Context',
+                    test: () => typeof chrome !== 'undefined',
+                    description: 'Chrome extension APIs available'
+                },
+                {
+                    name: 'Storage API',
+                    test: () => typeof chrome.storage !== 'undefined',
+                    description: 'Chrome storage API available'
+                },
+                {
+                    name: 'Scripting API',
+                    test: () => typeof chrome.scripting !== 'undefined',
+                    description: 'Chrome scripting API available'
+                },
+                {
+                    name: 'Tabs API',
+                    test: () => typeof chrome.tabs !== 'undefined',
+                    description: 'Chrome tabs API available'
+                },
+                {
+                    name: 'Runtime API',
+                    test: () => typeof chrome.runtime !== 'undefined',
+                    description: 'Chrome runtime API available'
+                },
+                {
+                    name: 'Current Tab Check',
+                    test: () => {
+                        if (typeof chrome === 'undefined') return false;
+                        return new Promise((resolve) => {
+                            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                                resolve(tabs && tabs.length > 0);
+                            });
+                        });
+                    },
+                    description: 'Can access current tab information'
+                }
+            ];
+            
+            let passedTests = 0;
+            let totalTests = tests.length;
+            
+            tests.forEach((test, index) => {
+                setTimeout(async () => {
+                    try {
+                        let result = false;
+                        if (typeof test.test === 'function') {
+                            result = await test.test();
+                        } else {
+                            result = test.test;
+                        }
+                        
+                        const testDiv = document.createElement('div');
+                        testDiv.className = `test-result ${result ? 'pass' : 'fail'}`;
+                        testDiv.innerHTML = `
+                            <strong>${result ? '✅' : '❌'} ${test.name}</strong><br>
+                            ${test.description}
+                        `;
+                        results.appendChild(testDiv);
+                        
+                        if (result) passedTests++;
+                        
+                        if (index === tests.length - 1) {
+                            // Final summary
+                            const summaryDiv = document.createElement('div');
+                            summaryDiv.className = `test-result ${passedTests === totalTests ? 'pass' : 'fail'}`;
+                            summaryDiv.innerHTML = `
+                                <strong>📊 Test Summary</strong><br>
+                                Passed: ${passedTests}/${totalTests}<br>
+                                ${passedTests === totalTests ? 'All tests passed! 🎉' : 'Some tests failed. Check the issues above.'}
+                            `;
+                            results.appendChild(summaryDiv);
+                            
+                            // Update output
+                            output.innerHTML = `
+                                <p><strong>Test Results:</strong></p>
+                                <p>✅ Passed: ${passedTests}</p>
+                                <p>❌ Failed: ${totalTests - passedTests}</p>
+                                <p>📈 Success Rate: ${Math.round((passedTests / totalTests) * 100)}%</p>
+                            `;
+                        }
+                    } catch (error) {
+                        const testDiv = document.createElement('div');
+                        testDiv.className = 'test-result fail';
+                        testDiv.innerHTML = `
+                            <strong>❌ ${test.name}</strong><br>
+                            Error: ${error.message}
+                        `;
+                        results.appendChild(testDiv);
+                    }
+                }, index * 500);
+            });
+        }
+        
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '<div class="test-result info">Tests cleared. Click "Run Tests" to start.</div>';
+            document.getElementById('testOutput').innerHTML = '<p>Click "Run Tests" to check extension functionality.</p>';
+        }
+        
+        // Auto-run tests when page loads
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 1000);
+        });
+    </script>
+</body>
+</html>

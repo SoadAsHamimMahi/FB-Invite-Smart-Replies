@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comment Detection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .test-result.pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-result.fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .comment-preview {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .comment-preview .user {
+            font-weight: bold;
+            color: #1877f2;
+        }
+        .comment-preview .text {
+            margin-top: 5px;
+            color: #1c1e21;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Facebook Comment Detection Test</h1>
+    <p>This page helps test and debug the comment detection functionality.</p>
+    
+    <div class="test-section">
+        <h2>📋 Test Instructions</h2>
+        <ol>
+            <li>Navigate to a Facebook post with comments</li>
+            <li>Open the extension popup</li>
+            <li>Go to the Reply tab</li>
+            <li>Click "Start" to test comment detection</li>
+            <li>Check the console logs for detailed information</li>
+        </ol>
+        
+        <button onclick="runCommentDetectionTest()">🔍 Test Comment Detection</button>
+        <button onclick="showDebugInfo()">🐛 Show Debug Info</button>
+        <button onclick="clearResults()">🗑️ Clear Results</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>🧪 Test Results</h2>
+        <div id="testResults">
+            <div class="test-result info">Click "Test Comment Detection" to start...</div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📊 Detected Comments</h2>
+        <div id="detectedComments">
+            <div class="test-result info">No comments detected yet</div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔧 Debug Information</h2>
+        <div id="debugInfo">
+            <div class="test-result info">Click "Show Debug Info" to see detailed information</div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📝 Common Issues & Solutions</h2>
+        
+        <h3>Issue: "No comments found on this post"</h3>
+        <div class="code-block">Possible causes:
+1. Comments haven't loaded yet - wait a few seconds
+2. Facebook UI has changed - selectors need updating
+3. Post has no comments
+4. Comments are in a different format than expected
+
+Solutions:
+1. Refresh the page and try again
+2. Scroll down to load more comments
+3. Check browser console for detailed logs
+4. Try on a different Facebook post</div>
+        
+        <h3>Issue: "Reply button not found"</h3>
+        <div class="code-block">Possible causes:
+1. Reply button is hidden or not visible
+2. Facebook UI has changed
+3. Comment element is not properly identified
+
+Solutions:
+1. Make sure the comment is fully visible on screen
+2. Try hovering over the comment to reveal buttons
+3. Check if the comment has a reply option enabled</div>
+        
+        <h3>Issue: "Failed to generate reply"</h3>
+        <div class="code-block">Possible causes:
+1. No active API key configured
+2. API key is invalid or expired
+3. Network connection issues
+4. AI service is down
+
+Solutions:
+1. Check Settings tab for active API key
+2. Verify API key is correct
+3. Test API key connection
+4. Check internet connection</div>
+    </div>
+
+    <script>
+        let testResults = [];
+        
+        function runCommentDetectionTest() {
+            const results = document.getElementById('testResults');
+            const comments = document.getElementById('detectedComments');
+            
+            results.innerHTML = '<div class="test-result info">Testing comment detection...</div>';
+            comments.innerHTML = '<div class="test-result info">Scanning for comments...</div>';
+            
+            // Check if we're on Facebook
+            if (!window.location.hostname.includes('facebook.com')) {
+                results.innerHTML = '<div class="test-result fail">❌ Not on Facebook - please navigate to a Facebook post</div>';
+                return;
+            }
+            
+            // Simulate the comment detection process
+            setTimeout(() => {
+                testCommentDetection();
+            }, 1000);
+        }
+        
+        function testCommentDetection() {
+            const results = document.getElementById('testResults');
+            const comments = document.getElementById('detectedComments');
+            
+            const tests = [
+                {
+                    name: 'Facebook Domain Check',
+                    test: () => window.location.hostname.includes('facebook.com'),
+                    description: 'Verify we are on Facebook'
+                },
+                {
+                    name: 'Comments Section Detection',
+                    test: () => {
+                        const selectors = [
+                            '[data-pagelet="CommentsUnit"]',
+                            '[data-testid="UFI2CommentsList"]',
+                            '[data-testid="comments"]',
+                            '.comments',
+                            '[role="main"] [data-testid*="comment"]'
+                        ];
+                        return selectors.some(selector => document.querySelector(selector) !== null);
+                    },
+                    description: 'Find the comments section'
+                },
+                {
+                    name: 'Comment Elements Detection',
+                    test: () => {
+                        const commentSelectors = [
+                            '[data-testid="UFI2Comment/root_depth_0"]',
+                            '[data-pagelet="CommentsUnit"] [role="article"]',
+                            '[role="article"] [data-testid*="comment"]',
+                            'div[data-testid*="comment"]'
+                        ];
+                        let found = 0;
+                        commentSelectors.forEach(selector => {
+                            const elements = document.querySelectorAll(selector);
+                            found += elements.length;
+                        });
+                        return found > 0;
+                    },
+                    description: 'Find individual comment elements'
+                },
+                {
+                    name: 'User Name Extraction',
+                    test: () => {
+                        const userNameSelectors = [
+                            '[data-testid="UFI2Comment/author_name"]',
+                            'strong a[role="link"]',
+                            '[data-testid="comment"] strong a',
+                            'a[role="link"] strong'
+                        ];
+                        return userNameSelectors.some(selector => document.querySelector(selector) !== null);
+                    },
+                    description: 'Find user name elements'
+                },
+                {
+                    name: 'Comment Text Extraction',
+                    test: () => {
+                        const textSelectors = [
+                            '[data-testid="UFI2Comment/body"]',
+                            '[data-testid="comment"] div[dir="auto"]',
+                            '[role="article"] div[dir="auto"]',
+                            'div[dir="auto"]'
+                        ];
+                        return textSelectors.some(selector => document.querySelector(selector) !== null);
+                    },
+                    description: 'Find comment text elements'
+                },
+                {
+                    name: 'Reply Button Detection',
+                    test: () => {
+                        const replySelectors = [
+                            '[data-testid="UFI2Comment/reply_button"]',
+                            '[aria-label="Reply"]',
+                            '[data-testid="reply_button"]',
+                            'a[href*="comment_reply"]'
+                        ];
+                        return replySelectors.some(selector => document.querySelector(selector) !== null);
+                    },
+                    description: 'Find reply buttons'
+                }
+            ];
+            
+            let passedTests = 0;
+            let totalTests = tests.length;
+            const resultsHTML = [];
+            const commentsHTML = [];
+            
+            tests.forEach((test, index) => {
+                setTimeout(() => {
+                    try {
+                        const result = test.test();
+                        const testDiv = document.createElement('div');
+                        testDiv.className = `test-result ${result ? 'pass' : 'fail'}`;
+                        testDiv.innerHTML = `<strong>${result ? '✅' : '❌'} ${test.name}</strong><br>${test.description}`;
+                        results.appendChild(testDiv);
+                        
+                        if (result) passedTests++;
+                        
+                        if (index === tests.length - 1) {
+                            // Final summary
+                            const summaryDiv = document.createElement('div');
+                            summaryDiv.className = `test-result ${passedTests === totalTests ? 'pass' : 'fail'}`;
+                            summaryDiv.innerHTML = `
+                                <strong>📊 Test Summary</strong><br>
+                                Passed: ${passedTests}/${totalTests}<br>
+                                ${passedTests === totalTests ? 'All tests passed! Comments should be detected. 🎉' : 'Some tests failed. Check the issues above.'}
+                            `;
+                            results.appendChild(summaryDiv);
+                            
+                            // Show detected comments
+                            showDetectedComments();
+                        }
+                    } catch (error) {
+                        const testDiv = document.createElement('div');
+                        testDiv.className = 'test-result fail';
+                        testDiv.innerHTML = `<strong>❌ ${test.name}</strong><br>Error: ${error.message}`;
+                        results.appendChild(testDiv);
+                    }
+                }, index * 500);
+            });
+        }
+        
+        function showDetectedComments() {
+            const commentsDiv = document.getElementById('detectedComments');
+            const detectedComments = extractComments();
+            
+            if (detectedComments.length === 0) {
+                commentsDiv.innerHTML = '<div class="test-result fail">❌ No comments detected</div>';
+                return;
+            }
+            
+            let html = `<div class="test-result pass">✅ Found ${detectedComments.length} comments</div>`;
+            
+            detectedComments.slice(0, 10).forEach((comment, index) => {
+                html += `
+                    <div class="comment-preview">
+                        <div class="user">${comment.user}</div>
+                        <div class="text">${comment.text}</div>
+                    </div>
+                `;
+            });
+            
+            if (detectedComments.length > 10) {
+                html += `<div class="test-result info">... and ${detectedComments.length - 10} more comments</div>`;
+            }
+            
+            commentsDiv.innerHTML = html;
+        }
+        
+        function extractComments() {
+            const comments = [];
+            
+            // Try to extract comments using the same logic as the extension
+            const commentSelectors = [
+                '[data-testid="UFI2Comment/root_depth_0"]',
+                '[data-pagelet="CommentsUnit"] [role="article"]',
+                '[role="article"] [data-testid*="comment"]',
+                'div[data-testid*="comment"]'
+            ];
+            
+            for (const selector of commentSelectors) {
+                const elements = document.querySelectorAll(selector);
+                for (const element of elements) {
+                    const user = extractUserName(element);
+                    const text = extractCommentText(element);
+                    
+                    if (user && text && text.length > 5) {
+                        comments.push({ user, text });
+                    }
+                }
+            }
+            
+            return comments;
+        }
+        
+        function extractUserName(element) {
+            const userNameSelectors = [
+                '[data-testid="UFI2Comment/author_name"]',
+                'strong a[role="link"]',
+                '[data-testid="comment"] strong a',
+                'a[role="link"] strong'
+            ];
+            
+            for (const selector of userNameSelectors) {
+                const userEl = element.querySelector(selector);
+                if (userEl && userEl.textContent.trim()) {
+                    return userEl.textContent.trim();
+                }
+            }
+            
+            return '';
+        }
+        
+        function extractCommentText(element) {
+            const textSelectors = [
+                '[data-testid="UFI2Comment/body"]',
+                '[data-testid="comment"] div[dir="auto"]',
+                '[role="article"] div[dir="auto"]',
+                'div[dir="auto"]'
+            ];
+            
+            for (const selector of textSelectors) {
+                const textEl = element.querySelector(selector);
+                if (textEl && textEl.textContent.trim()) {
+                    return textEl.textContent.trim();
+                }
+            }
+            
+            return '';
+        }
+        
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            
+            const debugInfo = {
+                url: window.location.href,
+                hostname: window.location.hostname,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                commentsSection: findCommentsSection(),
+                commentElements: countCommentElements(),
+                replyButtons: countReplyButtons(),
+                domStructure: analyzeDOMStructure()
+            };
+            
+            debugDiv.innerHTML = `
+                <div class="test-result info">🔍 Debug Information</div>
+                <div class="code-block">${JSON.stringify(debugInfo, null, 2)}</div>
+            `;
+        }
+        
+        function findCommentsSection() {
+            const selectors = [
+                '[data-pagelet="CommentsUnit"]',
+                '[data-testid="UFI2CommentsList"]',
+                '[data-testid="comments"]',
+                '.comments',
+                '[role="main"] [data-testid*="comment"]'
+            ];
+            
+            for (const selector of selectors) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    return {
+                        selector: selector,
+                        found: true,
+                        elementCount: element.querySelectorAll('*').length
+                    };
+                }
+            }
+            
+            return { found: false };
+        }
+        
+        function countCommentElements() {
+            const selectors = [
+                '[data-testid="UFI2Comment/root_depth_0"]',
+                '[data-pagelet="CommentsUnit"] [role="article"]',
+                '[role="article"] [data-testid*="comment"]',
+                'div[data-testid*="comment"]'
+            ];
+            
+            const counts = {};
+            selectors.forEach(selector => {
+                counts[selector] = document.querySelectorAll(selector).length;
+            });
+            
+            return counts;
+        }
+        
+        function countReplyButtons() {
+            const selectors = [
+                '[data-testid="UFI2Comment/reply_button"]',
+                '[aria-label="Reply"]',
+                '[data-testid="reply_button"]',
+                'a[href*="comment_reply"]'
+            ];
+            
+            const counts = {};
+            selectors.forEach(selector => {
+                counts[selector] = document.querySelectorAll(selector).length;
+            });
+            
+            return counts;
+        }
+        
+        function analyzeDOMStructure() {
+            const main = document.querySelector('[role="main"]');
+            if (!main) return { error: 'No main element found' };
+            
+            return {
+                mainElementFound: true,
+                mainChildren: main.children.length,
+                hasCommentsUnit: !!main.querySelector('[data-pagelet="CommentsUnit"]'),
+                hasUFI: !!main.querySelector('[data-testid*="UFI"]'),
+                totalDivs: main.querySelectorAll('div').length,
+                totalArticles: main.querySelectorAll('[role="article"]').length
+            };
+        }
+        
+        function clearResults() {
+            document.getElementById('testResults').innerHTML = '<div class="test-result info">Click "Test Comment Detection" to start...</div>';
+            document.getElementById('detectedComments').innerHTML = '<div class="test-result info">No comments detected yet</div>';
+            document.getElementById('debugInfo').innerHTML = '<div class="test-result info">Click "Show Debug Info" to see detailed information</div>';
+        }
+        
+        // Auto-run test if on Facebook
+        if (window.location.hostname.includes('facebook.com')) {
+            setTimeout(() => {
+                document.getElementById('testResults').innerHTML = '<div class="test-result info">✅ On Facebook - ready to test comment detection</div>';
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

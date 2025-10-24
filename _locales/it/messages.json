@@ -1,0 +1,68 @@
+{
+  "you_stop": {
+    "message":"L'hai fermato!"
+  },
+  "redirect": {
+    "message":"Lo script funziona sulla scheda \"Post\", ora la carico, ma bisogna lanciare lo script ancora una volta."
+  },
+  "total_inv_sent": {
+    "message":"Inviti totali inviati:"
+  },
+  "posts_checked": {
+    "message":"Post verificati:"
+  },
+  "do_not_use_anymore": {
+    "message":"NON UTILIZZARE più questo script oggi, poiché esiste un limite facebook."
+  },
+  "inviting_everyone": {
+    "message":"Verifico SOLO <b>post e foto</b>. Prova anche lo script, che <span style='color:green'>elabora i commenti e invita</span><br><span style='color:red;font-weight:bold;'>new:</span> <span style='color:blue'>like & invita ai commenti</span>: <a target=\"_blank\" href=\"https://www.invitelikecomment.com/\">https://www.invitelikecomment.com/</a>"
+  },
+  "total_invited": {
+    "message":"Totale invitati:"
+  },
+  "switch_tab_info": {
+    "message":"NON cambiare scheda e non minimizzare. Si puo aprire altre finestre sopra a questa cosi rimane in background."
+  },
+  "done": {
+    "message":"Fatto!"
+  },
+  "start_inv": {
+    "message":"Click per iniziare"
+  },
+  "paused": {
+    "message":". In pausa (dopo 40 inviti). Riprendera tra 30 secondi."
+  },
+  "review": {
+    "message":"Piace? Per favore, lasciate la vostra recensione... Provate anche la versione per i commenti :)"
+  },
+  "error1": {
+    "message":"ERRORE! Nessun post trovato! Lancia lo script nella scheda Posts oppure Foto della pagina. Se non va - contattami: info@invitelikecomment.com con qualche informazione e cercherò di aiutarti ;)"
+  },
+  "facebook_limit_block": {
+    "message":"Error: Facebook popup message shown, read it. If you see an error 'going too fast' or 'anti spam limitation': <b>click on 'let us know' and (important!) report this to Facebook</b>, set timeout 8-10 sec for invites (or 10-15 for comments) and <b>do not use Facebook at the same time</b>. Try again in 24h. This happens rarely even if you invite/scroll manually."
+  },
+  "after_text1": {
+    "message":"Piace? Convidi &amp; <b>lascia la recensione</b>"
+  },
+  "after_done": {
+    "message":"Fatto"
+  },
+  "after_share": {
+    "message":"Condividi"
+  },
+  "after_rate": {
+    "message":"Vota"
+  },
+  "after_scan_posts": {
+    "message":"Controlla tutti i post"
+  },
+  "after_scan_comments": {
+    "message":"Controlla anche commenti"
+  },
+  "after_close": {
+    "message":"Chiudi"
+  },
+  "after_ads_comments": {
+    "message":"Controlla anche l'estensione che <span style=\"color:green;font-weight:bold;\">mette Mi piace, invite e risponde a tutti i commenti</span> (con filtri, frasi casuali con sistema antispam)."
+  }
+}

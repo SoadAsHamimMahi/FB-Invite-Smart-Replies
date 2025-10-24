@@ -1,0 +1,125 @@
+{
+  "you_stop": {
+    "message":"You stopped the script!"
+  },
+  "UI_1": {
+    "message":"SINGLE page mode"
+  },
+  "UI_2": {
+    "message":"Open one of <b>recommended tabs</b> and choose the option:"
+  },
+  "UI_3": {
+    "message":"MULTI pages mode"
+  },
+  "UI_4": {
+    "message":"Set your pages in"
+  },
+  "UI_5": {
+    "message":"Settings"
+  },
+  "UI_6": {
+    "message":"and just run the desired option:"
+  },
+  "UI_7": {
+    "message":"Find more info and change limits on the"
+  },
+  "UI_8": {
+    "message":"settings page"
+  },
+  "UI_9": {
+    "message":"Full scan this page (or selected posts)"
+  },
+  "UI_10": {
+    "message":"Real-time scan newest posts"
+  },
+  "UI_11": {
+    "message":"Full scan ALL pages"
+  },
+  "UI_12": {
+    "message":"Real-time scan ALL pages"
+  },
+  "UI_13": {
+    "message":"Error. You have to choose pages to scan. Go to options."
+  },
+  "pause_1": {
+    "message":"Pause"
+  },
+  "pause_2": {
+    "message":"seconds before next loop."
+  },
+  "pause_3": {
+    "message":"Page will be reloaded"
+  },
+  "limit_err1": {
+    "message":"Facebook shows an error. Read it! <b>If you see 'invited too fast' / 'spam limitation'</b>, increase timeouts (how to increase: close the list of people and run the script) and DO NOT use the Facebook at the same time. Try again in 24h. This happens even if you invite manually, after ~24h it should work fine again. Sometimes you have to wait for 2-3 days to reset this. "
+  },
+  "pages_checked": {
+    "message":"Pages checked:"
+  },
+  "publ_check_tab": {
+    "message":"Publishing Tools tab:"
+  },
+  "redirect": {
+    "message":"Redirecting to the Posts tab, run script one more time."
+  },
+  "total_inv_sent": {
+    "message":"Total invites sent:"
+  },
+  "posts_checked": {
+    "message":"Posts checked:"
+  },
+  "do_not_use_anymore": {
+    "message":"Try in 24 hours, fb limit should be reset."
+  },
+  "inviting_everyone": {
+    "message":"<span style='color:red;font-weight:bold;'>Check also script:</span> <span style='color:blue'>like & invite from comments</span>: <a target=\"_blank\" href=\"https://www.invitelikecomment.com/\">https://www.invitelikecomment.com/</a>"
+  },
+  "total_invited": {
+    "message":"Total invited:"
+  },
+  "switch_tab_info": {
+    "message":"<span style='color:red'>Do not change tab, do not minimize.</span> At least 5% of this window must be visible on the screen otherwise browser may stop the extension for safety reasons."
+  },
+  "done": {
+    "message":"Done!"
+  },
+  "start_inv": {
+    "message":"Click to start invite"
+  },
+  "paused": {
+    "message":". Paused (every 40 invites). Will be resumed in 30 seconds."
+  },
+  "review": {
+    "message":"Found it useful? Please, review it... And also try extension to scan COMMENTS TOO :)"
+  },
+  "error1": {
+    "message":"ERROR! No posts found! Run the script on Creator Studio, Business Suite, Content Management or Publishing Tools tab where list of posts is shown! If something is wrong - contact me by info@invitelikecomment.com with some info and I'll try to help you ;)"
+  },
+  "facebook_limit_block": {
+    "message":"Error: Facebook popup message shown, read it. If you see an error 'going too fast' or 'anti spam limitation': <b>click on 'let us know' and (important!) report this to Facebook</b>, set timeout 8-10 sec for invites (or 10-15 for comments) and <b>do not use Facebook at the same time</b>. Try again in 24h. This happens rarely even if you invite/scroll manually."
+  },
+  "after_text1": {
+    "message":"<span style=\"color:green;font-weight:bold;\">Was it useful?</span> if you like my extension, please, <span style=\"color:green;font-weight:bold;\"><b>give it 5 stars and write a nice REVIEW.</b></span> This support me and I’ll work more on new features ;)"
+  },
+  "after_done": {
+    "message":"Done"
+  },
+  "after_share": {
+    "message":"Share"
+  },
+  "after_rate": {
+    "message":"Review"
+  },
+  "after_scan_posts": {
+    "message":"Scan all posts too"
+  },
+  "after_scan_comments": {
+    "message":"Scan comments too"
+  },
+  "after_close": {
+    "message":"Close"
+  },
+  "after_ads_comments": {
+    "message":"Also check extension that <span style=\"color:green;font-weight:bold;\">likes & invites & replies to all comments</span> (with filters, random phrases, anti-spam feature)."
+  }
+}

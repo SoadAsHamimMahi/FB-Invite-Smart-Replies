@@ -1,0 +1,194 @@
+@charset "utf-8";
+
+/* Local Roboto you already ship */
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  src: local("Roboto"), local("Roboto-Regular"),
+       url("fonts/roboto-latin-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215;
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 700;
+  src: local("Roboto Bold"), local("Roboto-Bold"),
+       url("fonts/roboto-latin-700.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215;
+}
+
+/* ---------- THEME ---------- */
+:root {
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --primary: #2563eb;           /* blue */
+  --primary-600: #1d4ed8;
+  --primary-700: #1e40af;
+  --success: #10b981;           /* emerald */
+  --warning: #f59e0b;           /* amber */
+  --shadow: 0 12px 30px rgba(2, 6, 23, .14);
+}
+
+/* ---------- PANEL ---------- */
+.fbt{
+  position: fixed;
+  right: 24px;
+  top: 16px;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
+  font-size: 14px;
+  line-height: 1.4;
+  z-index: 2147483647;
+  overflow: hidden;
+}
+
+/* ---------- HEADER ---------- */
+.fbe-header{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  height:auto;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+  color:#fff;
+}
+.fbe-header h3{
+  margin:0;
+  padding:0;
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:.2px;
+}
+.fbe-version{
+  font-size:12px;
+  opacity:.9;
+  padding-left:8px;
+}
+.fbe-btn-close{
+  position: relative;
+  float: none;
+  margin: 0;
+  border: 0;
+  background: rgba(255,255,255,.18);
+  color:#fff;
+  border-radius: 10px;
+  font-size: 16px;
+  padding: 6px 10px;
+  line-height: 1;
+  cursor:pointer;
+  transition: transform .06s ease-in-out, opacity .2s;
+}
+.fbe-btn-close:hover{ opacity:.9; }
+.fbe-btn-close:active{ transform: translateY(1px); }
+.fbe-btn-close:before{ content:"×"; }
+
+/* ---------- BODY ---------- */
+.fbe-content{
+  width:auto;
+  padding: 14px 16px 6px 16px;
+  text-align:left;
+}
+
+/* ---------- ACTIONS (primary CTAs) ---------- */
+.fbe-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  padding: 8px 0 4px;
+  text-align:left;
+}
+.fbe-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding: 12px 16px;
+  height:auto;
+  border-radius: 12px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color:#fff;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .25);
+  transition: filter .15s ease, transform .06s ease;
+}
+.fbe-btn:hover{ filter:brightness(.98); }
+.fbe-btn:active{ transform: translateY(1px); }
+.fbe-btn-inactive{
+  background:#cdd5df;
+  border-color:#cdd5df;
+  color:#4b5563;
+  box-shadow:none;
+}
+/* big round play/pause removed – keep flat buttons only */
+.fbe-btn-main, .fbe-btn-icon, .fbe-btn-speed { display:none !important; }
+
+/* secondary buttons (if you reuse .btn-div) */
+.btn-div{ display:inline-block; margin:2px 0; }
+
+/* ---------- MINI STATUS / COUNTS ---------- */
+.fbe-status{
+  margin: 12px -16px -2px;
+  background: #f8fafc;
+  color: #0f5132;
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  height:auto;
+  letter-spacing: 0;
+  overflow: visible;
+}
+.fbe-status-active{ background: #ecfdf5; }
+
+/* subtle counter style (if you keep it) */
+.fbe-invites-count{
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--success);
+  text-shadow: none;
+  padding: 0;
+}
+.fbe-invites-label{
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- CLEANUP: hide clutter ---------- */
+/* Long intros/tutorials/images/legacy boxes */
+.fbe-intro,
+.fbe-intro-screen,
+.fbe-info,
+.fbe-info-box,
+.fbe-invites,
+.fbe-actions-main,
+.red-title,
+.margin-top,
+.warning-notification,
+.licDiv,
+#paidAlready,
+.saveLic,
+.delLic,
+.borderLic,
+#licDivTitle,
+#fp_att,
+.fbe-time { display:none !important; }
+
+/* ---------- UTIL ---------- */
+.fbe-btn.disabled{ opacity:.45; pointer-events:none; }
+.fbe-intro.imgdisp a img{ display:none !important; }
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 520px){
+  .fbt{ right: 8px; left: 8px; width:auto; border-radius:12px; }
+  .fbe-header{ padding:12px; }
+  .fbe-content{ padding:12px; }
+  .fbe-status{ margin:10px -12px -2px; }
+}
