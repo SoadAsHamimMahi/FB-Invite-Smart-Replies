@@ -60,6 +60,9 @@ class FacebookReplyExtractor {
             '[data-testid*="photo"] img'
         ];
         
+        // Stop mechanism flags
+        this.stopRequested = false; // In-memory flag for immediate synchronous checks
+        
         this.setupMessageListener();
     }
     
@@ -84,11 +87,31 @@ class FacebookReplyExtractor {
                     (async () => {
                         const max = message?.maxComments || 'all';
                         const autoLoad = message?.autoLoad !== false;
+                        const batchSize = message?.batchSize || null;
+                        const batchNumber = message?.batchNumber || null;
                         try {
-                            const result = await this.scanCommentsWithLoading(max, autoLoad);
+                            // Clear cancellation flags at start
+                            this.stopRequested = false; // Clear in-memory flag
+                            await chrome.storage.local.set({ scanCancelled: false });
+                            const result = await this.scanCommentsWithLoading(max, autoLoad, batchSize, batchNumber);
                             sendResponse(result);
                         } catch (e) {
                             sendResponse({ success: false, error: e?.message || 'Scan failed' });
+                        }
+                    })();
+                    return true;
+                
+                // Handle cancellation request
+                case 'CANCEL_SCAN':
+                    // Set in-memory flag immediately (synchronous)
+                    this.stopRequested = true;
+                    // Also set storage flag for async operations
+                    (async () => {
+                        try {
+                            await chrome.storage.local.set({ scanCancelled: true });
+                            sendResponse({ success: true });
+                        } catch (e) {
+                            sendResponse({ success: false, error: e?.message });
                         }
                     })();
                     return true;
@@ -97,6 +120,39 @@ class FacebookReplyExtractor {
                     sendResponse({ success: false, error: 'Unknown message type' });
             }
         });
+    }
+    
+    // Unified stop check - checks both in-memory flag and limit
+    shouldStop(currentCount, limit) {
+        // Check in-memory flag first (synchronous, immediate)
+        if (this.stopRequested) {
+            return true;
+        }
+        // Check limit
+        if (limit !== null && currentCount >= limit) {
+            return true;
+        }
+        return false;
+    }
+    
+    // Check if scan has been cancelled (async, checks storage)
+    async checkScanCancelled() {
+        // First check in-memory flag (synchronous)
+        if (this.stopRequested) {
+            return true;
+        }
+        // Then check storage (async)
+        try {
+            const result = await chrome.storage.local.get(['scanCancelled']);
+            // If storage says cancelled, also set in-memory flag
+            if (result.scanCancelled === true) {
+                this.stopRequested = true;
+                return true;
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
     }
     
     buildPrompt(caption, commentText) {
@@ -256,27 +312,110 @@ class FacebookReplyExtractor {
         });
     }
     
-    async extractComments() {
+    async extractComments(limit = null, skipScanned = false) {
         // Backward-compatible single-pass extraction without hard 25 cap
+        // limit: stop after extracting N UNIQUE comments
+        // skipScanned: skip elements marked with data-scanned="true"
         const comments = [];
+        const uniqueKeys = new Set(); // Track unique comments during extraction to enforce limit properly
+        
         try {
             await this.sleep(1000);
+            
+            // Check for stop before starting (async check for storage flag)
+            if (await this.checkScanCancelled()) {
+                this.log('Scan cancelled before extractComments started');
+                return [];
+            }
+            
             const section = this.findCommentsSection();
             if (!section) return [];
+            
+            // Get elements in order (top to bottom)
             const elements = this.findAllCommentElements(section);
+            
             for (const el of elements) {
+                // Check shouldStop() BEFORE processing each element (synchronous, immediate)
+                if (this.shouldStop(uniqueKeys.size, limit)) {
+                    this.log(`Stop detected at ${uniqueKeys.size} comments (limit: ${limit}), returning partial results`);
+                    break;
+                }
+                
+                // Skip already scanned comments if requested
+                if (skipScanned && el.dataset.scanned === 'true') {
+                    continue;
+                }
+                
                 try {
                     const c = await this.extractSingleComment(el);
-                    if (c && c.user && c.text && c.text.length > 3) comments.push(c);
+                    if (c && c.user && c.text && c.text.length > 3) {
+                        const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                        
+                        // Only add if it's unique
+                        if (!uniqueKeys.has(k)) {
+                            // Check shouldStop() again BEFORE adding (limit might be reached)
+                            if (this.shouldStop(uniqueKeys.size, limit)) {
+                                this.log(`Stop detected before adding comment ${uniqueKeys.size + 1}, limit: ${limit}`);
+                                break;
+                            }
+                            
+                            uniqueKeys.add(k);
+                            comments.push(c);
+                            // Mark as scanned
+                            if (skipScanned) {
+                                el.dataset.scanned = 'true';
+                            }
+                            
+                            // Send progress update for each extracted comment
+                            if (limit !== null) {
+                                try {
+                                    chrome.runtime.sendMessage({ 
+                                        type: 'SCAN_PROGRESS', 
+                                        current: uniqueKeys.size, 
+                                        target: limit 
+                                    });
+                                } catch(_) {}
+                            }
+                            
+                            // Check shouldStop() AFTER adding (in case stop was requested during extraction)
+                            if (this.shouldStop(uniqueKeys.size, limit)) {
+                                this.log(`Stop detected after adding comment ${uniqueKeys.size}, limit: ${limit}`);
+                                break;
+                            }
+                        }
+                        // If duplicate, skip it (don't mark as scanned to allow retry in next batch)
+                    }
                 } catch(_) {}
             }
-            // de-dupe
+            
+            // Final deduplication (shouldn't be needed since we track during extraction, but safety check)
             const seen = new Set();
             const unique = [];
             for (const c of comments) {
                 const k = `${c.user}_${(c.text||'').substring(0,50)}`;
-                if (!seen.has(k)) { seen.add(k); unique.push(c); }
+                if (!seen.has(k)) { 
+                    seen.add(k); 
+                    unique.push(c); 
+                }
             }
+            
+            // STRICT CAP: Never return more than limit
+            if (limit !== null && unique.length > limit) {
+                this.log(`Capping unique comments from ${unique.length} to ${limit}`);
+                unique.splice(limit);
+            }
+            
+            // Send final progress update
+            if (limit !== null) {
+                try {
+                    chrome.runtime.sendMessage({ 
+                        type: 'SCAN_PROGRESS', 
+                        current: unique.length, 
+                        target: limit 
+                    });
+                } catch(_) {}
+            }
+            
             return unique;
         } catch (e) {
             console.error('Comment extraction error:', e);
@@ -352,17 +491,30 @@ class FacebookReplyExtractor {
         const uniqueElements = [...new Set(commentElements)];
         
         // Filter out elements that are too small or don't contain text (loosened)
-        return uniqueElements.filter(el => {
+        const filtered = uniqueElements.filter(el => {
             const text = el.textContent || '';
             const hasText = text.trim().length > 3;
             const hasUser = this.findUserName(el) !== '';
             const visible = (el.offsetHeight > 0 && el.offsetWidth > 0);
             return hasText && hasUser && visible;
         });
+        
+        // Sort elements by their position in the DOM (top to bottom) to ensure consistent order
+        filtered.sort((a, b) => {
+            const rectA = a.getBoundingClientRect();
+            const rectB = b.getBoundingClientRect();
+            // Sort by top position first, then by left position
+            if (Math.abs(rectA.top - rectB.top) > 10) {
+                return rectA.top - rectB.top;
+            }
+            return rectA.left - rectB.left;
+        });
+        
+        return filtered;
     }
 
     // Progressive scanner that auto-loads more comments until target reached or stalled
-    async scanCommentsWithLoading(maxComments, autoLoad) {
+    async scanCommentsWithLoading(maxComments, autoLoad, batchSize = null, batchNumber = null) {
         const all = [];
         const start = Date.now();
         const timeoutMs = 120000; // 2 minutes
@@ -370,7 +522,64 @@ class FacebookReplyExtractor {
         let stagnant = 0;
         const maxStagnant = 3;
         
+        // If batch mode, extract only one batch
+        if (batchSize !== null && batchNumber !== null) {
+            try {
+                const batch = await this.extractCommentsBatch(batchSize, batchNumber);
+                return {
+                    success: true,
+                    data: {
+                        comments: batch.comments,
+                        caption: await this.extractCaption(),
+                        images: await this.extractImages(),
+                        batchNumber: batch.batchNumber,
+                        hasMore: batch.hasMore,
+                        totalScanned: batch.totalScanned,
+                        cancelled: batch.cancelled || false
+                    }
+                };
+            } catch (e) {
+                console.warn('Batch scan error:', e);
+                // If cancelled and we have partial results, try to return them
+                if (e.message && e.message.includes('cancelled')) {
+                    // Check if we can get any comments that were already extracted
+                    try {
+                        const section = this.findCommentsSection();
+                        if (section) {
+                            const allElements = this.findAllCommentElements(section);
+                            const scannedElements = allElements.filter(el => el.dataset.scanned === 'true');
+                            if (scannedElements.length > 0) {
+                                // Try to extract from already scanned elements
+                                const partialComments = await this.extractComments(null, false);
+                                if (partialComments.length > 0) {
+                                    return {
+                                        success: true,
+                                        data: {
+                                            comments: partialComments,
+                                            caption: await this.extractCaption(),
+                                            images: await this.extractImages(),
+                                            cancelled: true
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    } catch(_) {
+                        // Ignore errors in recovery attempt
+                    }
+                }
+                return { success: false, error: e?.message || 'Batch scan failed' };
+            }
+        }
+        
+        // Legacy mode: scan all comments
         while (all.length < target && (Date.now() - start) < timeoutMs) {
+            // Check shouldStop() (synchronous check)
+            if (this.shouldStop(all.length, target)) {
+                this.log(`Stop detected during legacy scan loop at ${all.length} comments`);
+                break;
+            }
+            
             try {
                 const pass = await this.extractComments();
                 // merge
@@ -392,24 +601,552 @@ class FacebookReplyExtractor {
                 window.scrollBy(0, 600);
                 await this.sleep(1500);
             } catch (e) {
+                // If it's a cancellation error, break instead of throwing
+                if (e.message && e.message.includes('cancelled')) {
+                    this.log('Cancellation detected in legacy scan, breaking loop');
+                    break;
+                }
                 console.warn('Progressive scan pass error:', e);
                 break;
             }
         }
         return { success: true, data: { comments: all, caption: await this.extractCaption(), images: await this.extractImages() } };
     }
+    
+    // Extract a single batch of comments
+    async extractCommentsBatch(batchSize, batchNumber) {
+        const batchSizeNum = parseInt(batchSize, 10) || 100;
+        const comments = [];
+        let hasMore = false;
+        
+        try {
+            const section = this.findCommentsSection();
+            if (!section) {
+                return {
+                    comments: [],
+                    batchNumber: batchNumber || 1,
+                    hasMore: false,
+                    totalScanned: 0
+                };
+            }
+            
+            // Aggressively load more comments before extracting
+            // This only loads comments into DOM, doesn't extract or send progress
+            // For first batch, click "View more comments" exactly 5 times, then wait for user to continue
+            if (batchNumber === 1) {
+                this.log('First batch: Clicking "View more comments" exactly 5 times...');
+                for (let i = 0; i < 5; i++) {
+                    // Check shouldStop() before each click (synchronous check)
+                    if (this.shouldStop(comments.length, batchSizeNum)) {
+                        this.log('Stop detected during initial loading, extracting available comments...');
+                        // Try to extract whatever comments are available
+                        try {
+                            const availableComments = await this.extractComments(batchSizeNum, true);
+                            if (availableComments.length > 0) {
+                                this.log(`Found ${availableComments.length} comments before stop`);
+                                // Return partial results
+                                const seen = new Set();
+                                const unique = [];
+                                for (const c of availableComments) {
+                                    const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                                    if (!seen.has(k)) {
+                                        seen.add(k);
+                                        unique.push(c);
+                                    }
+                                }
+                                return {
+                                    comments: unique,
+                                    batchNumber: batchNumber || 1,
+                                    hasMore: false,
+                                    totalScanned: unique.length,
+                                    cancelled: true
+                                };
+                            }
+                        } catch(_) {
+                            // If extraction fails, return empty
+                        }
+                        // Return empty if stop detected and no comments found
+                        return {
+                            comments: [],
+                            batchNumber: batchNumber || 1,
+                            hasMore: false,
+                            totalScanned: 0,
+                            cancelled: true
+                        };
+                    }
+                    
+                    this.scrollCommentsSection(section);
+                    const clicked = this.clickLoadMoreButtonsOnce(section);
+                    window.scrollBy(0, 800);
+                    await this.sleep(2000); // Wait for comments to load
+                    if (clicked > 0) {
+                        this.log(`Click ${i + 1}/5: Clicked ${clicked} "View more comments" button(s)`);
+                    }
+                }
+                this.log('Finished clicking "View more comments" 5 times. Waiting for user to continue...');
+                
+                // Check shouldStop() before setting up continue wait
+                if (this.shouldStop(comments.length, batchSizeNum)) {
+                    this.log('Stop detected before continue wait, extracting available comments...');
+                    try {
+                        const availableComments = await this.extractComments(batchSizeNum, true);
+                        if (availableComments.length > 0) {
+                            const seen = new Set();
+                            const unique = [];
+                            for (const c of availableComments) {
+                                const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                                if (!seen.has(k)) {
+                                    seen.add(k);
+                                    unique.push(c);
+                                }
+                            }
+                            return {
+                                comments: unique,
+                                batchNumber: batchNumber || 1,
+                                hasMore: false,
+                                totalScanned: unique.length,
+                                cancelled: true
+                            };
+                        }
+                    } catch(_) {}
+                    return {
+                        comments: [],
+                        batchNumber: batchNumber || 1,
+                        hasMore: false,
+                        totalScanned: 0,
+                        cancelled: true
+                    };
+                }
+                
+                // Clear any existing flags first
+                try {
+                    await chrome.storage.local.set({ 
+                        continueScanning: false,
+                        showContinueScanning: false
+                    });
+                } catch(_) {}
+                
+                // Set flag in storage to show "Continue scanning" button
+                try {
+                    await chrome.storage.local.set({ 
+                        showContinueScanning: true,
+                        continueScanningBatch: batchNumber
+                    });
+                    this.log('Set showContinueScanning flag in storage');
+                } catch(e) {
+                    this.log(`Error setting storage flag: ${e.message}`);
+                }
+                
+                // Give storage a moment to propagate
+                await this.sleep(300);
+                
+                // Wait for user to click "Continue scanning" button
+                this.log('Waiting for user to click "Continue Scanning" button...');
+                await this.waitForContinueScanning();
+                
+                // Check shouldStop() after waiting
+                if (this.shouldStop(comments.length, batchSizeNum)) {
+                    this.log('Stop detected after continue wait, extracting available comments...');
+                    try {
+                        const availableComments = await this.extractComments(batchSizeNum, true);
+                        if (availableComments.length > 0) {
+                            const seen = new Set();
+                            const unique = [];
+                            for (const c of availableComments) {
+                                const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                                if (!seen.has(k)) {
+                                    seen.add(k);
+                                    unique.push(c);
+                                }
+                            }
+                            return {
+                                comments: unique,
+                                batchNumber: batchNumber || 1,
+                                hasMore: false,
+                                totalScanned: unique.length,
+                                cancelled: true
+                            };
+                        }
+                    } catch(_) {}
+                    return {
+                        comments: [],
+                        batchNumber: batchNumber || 1,
+                        hasMore: false,
+                        totalScanned: 0,
+                        cancelled: true
+                    };
+                }
+                
+                this.log('User clicked continue. Proceeding to extraction.');
+                // Skip loadMoreComments for first batch since we already clicked 5 times
+            } else {
+                // For subsequent batches, check stop before loading
+                if (this.shouldStop(comments.length, batchSizeNum)) {
+                    this.log('Stop detected before loadMoreComments, returning partial results');
+                    return {
+                        comments: [],
+                        batchNumber: batchNumber || 1,
+                        hasMore: false,
+                        totalScanned: 0,
+                        cancelled: true
+                    };
+                }
+                await this.loadMoreComments(section, batchSizeNum);
+            }
+            
+            // Extract comments with limit, skipping already scanned ones
+            // Progress updates are sent incrementally during extraction
+            // extractComments() now tracks unique comments and stops at exact limit
+            const batchComments = await this.extractComments(batchSizeNum, true);
+            
+            // Check shouldStop() after extraction
+            if (this.shouldStop(batchComments.length, batchSizeNum)) {
+                this.log(`Stop detected after extraction, returning ${batchComments.length} comments`);
+                const seen = new Set();
+                const unique = [];
+                for (const c of batchComments) {
+                    const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                    if (!seen.has(k)) {
+                        seen.add(k);
+                        unique.push(c);
+                    }
+                }
+                return {
+                    comments: unique,
+                    batchNumber: batchNumber || 1,
+                    hasMore: false,
+                    totalScanned: unique.length,
+                    cancelled: true
+                };
+            }
+            
+            // STRICT LIMIT: Cap to exact batch size (shouldn't be needed, but safety)
+            if (batchComments.length > batchSizeNum) {
+                this.log(`WARNING: Comments exceeded limit (${batchComments.length} > ${batchSizeNum}), capping`);
+                batchComments.splice(batchSizeNum);
+            }
+            
+            comments.push(...batchComments);
+            this.log(`Extracted ${batchComments.length} comments (target: ${batchSizeNum})`);
+            
+            // If we got fewer than requested, that's fine - we've extracted all available unique comments
+            // Don't try to extract more as extractComments() already enforces the limit on unique comments
+            
+            // Check if there are more unscanned comments available
+            const allElements = this.findAllCommentElements(section);
+            const unscannedCount = allElements.filter(el => el.dataset.scanned !== 'true').length;
+            hasMore = unscannedCount > 0;
+            
+            // Deduplicate within batch
+            const seen = new Set();
+            const unique = [];
+            for (const c of comments) {
+                const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                if (!seen.has(k)) {
+                    seen.add(k);
+                    unique.push(c);
+                }
+            }
+            
+            // STRICT LIMIT: After deduplication, cap to exact batch size
+            if (unique.length > batchSizeNum) {
+                this.log(`After deduplication: ${unique.length} comments, capping to ${batchSizeNum}`);
+                unique.splice(batchSizeNum);
+            }
+            
+            this.log(`Final batch result: ${unique.length} unique comments (limit: ${batchSizeNum})`);
+            
+            // Calculate total scanned (approximate) - reuse section variable
+            let totalScanned = 0;
+            if (section) {
+                const allElements = this.findAllCommentElements(section);
+                totalScanned = allElements.filter(el => el.dataset.scanned === 'true').length;
+            }
+            
+            return {
+                comments: unique,
+                batchNumber: batchNumber || 1,
+                hasMore: hasMore,
+                totalScanned: totalScanned
+            };
+        } catch (e) {
+            console.error('Extract batch error:', e);
+            
+            // If cancelled, return partial results if we have any
+            if (e.message && e.message.includes('cancelled') && comments.length > 0) {
+                this.log(`Scan cancelled, returning ${comments.length} partial comments`);
+                
+                // Deduplicate partial results
+                const seen = new Set();
+                const unique = [];
+                for (const c of comments) {
+                    const k = `${c.user}_${(c.text||'').substring(0,50)}`;
+                    if (!seen.has(k)) {
+                        seen.add(k);
+                        unique.push(c);
+                    }
+                }
+                
+                return {
+                    comments: unique,
+                    batchNumber: batchNumber || 1,
+                    hasMore: false,
+                    totalScanned: unique.length,
+                    cancelled: true
+                };
+            }
+            
+            return {
+                comments: [],
+                batchNumber: batchNumber || 1,
+                hasMore: false,
+                totalScanned: 0
+            };
+        }
+    }
 
-    clickLoadMoreButtonsOnce() {
-        const buttons = document.querySelectorAll('div[role="button"], a[role="button"], button');
+    clickLoadMoreButtonsOnce(section = null) {
+        let buttons;
+        if (section) {
+            // Look for buttons within the comments section first
+            buttons = section.querySelectorAll('div[role="button"], a[role="button"], button, span[role="button"], a, div[tabindex]');
+        } else {
+            buttons = document.querySelectorAll('div[role="button"], a[role="button"], button, span[role="button"], a, div[tabindex]');
+        }
+        
         let clicked = 0;
+        const clickedButtons = new Set();
+        
         buttons.forEach(btn => {
-            const txt = (btn.textContent||'').toLowerCase();
+            if (clickedButtons.has(btn)) return;
+            
+            const txt = (btn.textContent||'').toLowerCase().trim();
             const aria = (btn.getAttribute('aria-label')||'').toLowerCase();
-            if ((txt.includes('view more') || txt.includes('view previous') || txt.includes('more comments') || aria.includes('more')) && btn.offsetParent !== null) {
-                try { btn.click(); clicked++; } catch(_) {}
+            const dataTestId = (btn.getAttribute('data-testid')||'').toLowerCase();
+            const href = (btn.getAttribute('href')||'').toLowerCase();
+            
+            // Facebook uses "View more comments" - prioritize this exact text
+            const isViewMoreComments = (
+                txt === 'view more comments' ||
+                txt.includes('view more comments') ||
+                (txt === 'view more' && (aria.includes('comment') || dataTestId.includes('comment'))) ||
+                aria === 'view more comments' ||
+                aria.includes('view more comments') ||
+                dataTestId.includes('view_more_comments') ||
+                dataTestId.includes('viewmore') ||
+                href.includes('view_more_comments')
+            ) && btn.offsetParent !== null;
+            
+            // Also check for other variations as fallback
+            const isOtherMoreButton = (
+                txt.includes('view previous') || 
+                txt.includes('see more comments') ||
+                txt.includes('show more comments') ||
+                (aria.includes('more') && aria.includes('comment'))
+            ) && btn.offsetParent !== null;
+            
+            if (isViewMoreComments || isOtherMoreButton) {
+                try { 
+                    // Scroll button into view first
+                    btn.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    
+                    btn.click(); 
+                    clickedButtons.add(btn);
+                    clicked++; 
+                    
+                    this.log(`Clicked "View more comments" button`);
+                } catch(e) {
+                    console.warn('Error clicking view more button:', e);
+                }
             }
         });
+        
         return clicked;
+    }
+    
+    // Aggressively load more comments by scrolling and clicking buttons
+    // NOTE: This function only loads comments, it does NOT send progress updates
+    // Progress should only be sent when comments are actually extracted
+    // Stops when targetCount unscanned comments are available
+    async loadMoreComments(section, targetCount) {
+        const maxAttempts = 15;
+        let attempts = 0;
+        let lastCount = 0;
+        let stagnantCount = 0;
+        
+        while (attempts < maxAttempts && stagnantCount < 3) {
+            // Check shouldStop() (synchronous check)
+            if (this.shouldStop(0, null)) {
+                this.log('Stop detected during loadMoreComments');
+                break;
+            }
+            
+            // Count current unscanned comments (for internal logic only, not for progress)
+            const allElements = this.findAllCommentElements(section);
+            const unscannedCount = allElements.filter(el => el.dataset.scanned !== 'true').length;
+            
+            // If we have enough unscanned comments available, stop immediately
+            if (unscannedCount >= targetCount) {
+                this.log(`Found ${unscannedCount} unscanned comments, stopping load (target: ${targetCount})`);
+                break;
+            }
+            
+            // Check if we're making progress
+            if (unscannedCount === lastCount) {
+                stagnantCount++;
+            } else {
+                stagnantCount = 0;
+            }
+            lastCount = unscannedCount;
+            
+            // Scroll within the comments section
+            this.scrollCommentsSection(section);
+            
+            // Click all "View more" buttons within the comments section
+            const clicked = this.clickLoadMoreButtonsOnce(section);
+            
+            // Also try scrolling the window
+            window.scrollBy(0, 800);
+            
+            // Wait for comments to load
+            await this.sleep(2000);
+            
+            // Re-check count after loading
+            const newElements = this.findAllCommentElements(section);
+            const newUnscannedCount = newElements.filter(el => el.dataset.scanned !== 'true').length;
+            
+            // If we've reached the target, stop immediately
+            if (newUnscannedCount >= targetCount) {
+                this.log(`Reached target of ${targetCount} unscanned comments, stopping`);
+                break;
+            }
+            
+            attempts++;
+        }
+        
+        // Final check
+        const finalElements = this.findAllCommentElements(section);
+        const finalUnscannedCount = finalElements.filter(el => el.dataset.scanned !== 'true').length;
+        this.log(`Load complete: ${finalUnscannedCount} unscanned comments available (target: ${targetCount})`);
+    }
+    
+    // Scroll within the comments section to trigger lazy loading
+    scrollCommentsSection(section) {
+        try {
+            // Strategy 1: Try to find scrollable containers with specific Facebook selectors
+            const facebookScrollSelectors = [
+                '[data-pagelet="CommentsUnit"]',
+                '[data-testid="UFI2CommentsList"]',
+                '[role="main"] [style*="overflow"]',
+                'div[style*="max-height"]',
+                'div[style*="overflow-y"]'
+            ];
+            
+            for (const selector of facebookScrollSelectors) {
+                const containers = section.querySelectorAll(selector);
+                for (const container of containers) {
+                    if (container.scrollHeight > container.clientHeight) {
+                        // Scroll to bottom
+                        container.scrollTop = container.scrollHeight;
+                        // Also try smooth scroll
+                        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                    }
+                }
+            }
+            
+            // Strategy 2: Try to find any scrollable container within the comments section
+            const scrollableContainers = section.querySelectorAll('[style*="overflow"], [style*="scroll"], [style*="max-height"]');
+            
+            for (const container of scrollableContainers) {
+                if (container.scrollHeight > container.clientHeight) {
+                    // Scroll to bottom of this container
+                    container.scrollTop = container.scrollHeight;
+                    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                }
+            }
+            
+            // Strategy 3: Scroll the section itself if it's scrollable
+            if (section.scrollHeight > section.clientHeight) {
+                section.scrollTop = section.scrollHeight;
+                section.scrollTo({ top: section.scrollHeight, behavior: 'smooth' });
+            }
+            
+            // Strategy 4: Scroll the last comment element into view (triggers lazy loading)
+            const allComments = this.findAllCommentElements(section);
+            if (allComments.length > 0) {
+                const lastComment = allComments[allComments.length - 1];
+                // Scroll into view with different options
+                lastComment.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                // Also try instant scroll
+                setTimeout(() => {
+                    lastComment.scrollIntoView({ behavior: 'auto', block: 'end' });
+                }, 100);
+            }
+            
+            // Strategy 5: Scroll window to bring comments section into view
+            const rect = section.getBoundingClientRect();
+            if (rect.bottom > window.innerHeight) {
+                window.scrollTo({
+                    top: window.scrollY + rect.bottom - window.innerHeight + 200,
+                    behavior: 'smooth'
+                });
+            }
+        } catch (e) {
+            console.warn('Error scrolling comments section:', e);
+        }
+    }
+    
+    log(message) {
+        console.log(`[FB Reply Extractor] ${message}`);
+    }
+    
+    // Wait for user to click "Continue scanning" button
+    async waitForContinueScanning() {
+        return new Promise((resolve) => {
+            let checkCount = 0;
+            const maxChecks = 600; // 5 minutes max wait (600 * 500ms)
+            
+            // Poll storage for continue flag
+            const checkContinue = async () => {
+                checkCount++;
+                try {
+                    // Check for cancellation first
+                    const cancelResult = await chrome.storage.local.get(['scanCancelled']);
+                    if (cancelResult.scanCancelled === true) {
+                        this.log('Scan cancelled during waitForContinueScanning');
+                        resolve(); // Resolve to exit, but cancellation will be checked after
+                        return;
+                    }
+                    
+                    const result = await chrome.storage.local.get(['continueScanning', 'showContinueScanning']);
+                    
+                    if (result.continueScanning === true) {
+                        this.log('Continue scanning flag detected, proceeding...');
+                        // Clear the flags
+                        await chrome.storage.local.set({ 
+                            continueScanning: false,
+                            showContinueScanning: false
+                        });
+                        resolve();
+                    } else if (checkCount >= maxChecks) {
+                        this.log('Timeout waiting for continue, proceeding anyway...');
+                        resolve();
+                    } else {
+                        // Check again in 500ms
+                        setTimeout(checkContinue, 500);
+                    }
+                } catch(e) {
+                    this.log(`Error checking storage: ${e.message}`);
+                    // If storage fails, wait a bit and try again
+                    if (checkCount < maxChecks) {
+                        setTimeout(checkContinue, 500);
+                    } else {
+                        resolve();
+                    }
+                }
+            };
+            checkContinue();
+        });
     }
     
     looksLikeComment(element) {

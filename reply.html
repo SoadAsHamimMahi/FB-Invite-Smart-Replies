@@ -406,6 +406,10 @@
         :root[data-theme="dark"] .status.info{ background:rgba(96,165,250,.12); color:var(--primary); }
         :root[data-theme="dark"] .progress-bar{ background:#1f2937; }
         :root[data-theme="dark"] .progress-fill{ background:linear-gradient(90deg,var(--primary),#93c5fd); }
+        :root[data-theme="dark"] #scanProgressContainer{ color:var(--text); }
+        :root[data-theme="dark"] #scanProgressText{ color:var(--muted); }
+        :root[data-theme="dark"] #scanProgressCount{ color:var(--accent); }
+        :root[data-theme="dark"] #scanProgressFill{ background:linear-gradient(90deg,var(--accent),#22d3ee); }
     </style>
 </head>
 <body data-theme="dark">
@@ -495,6 +499,12 @@
                     <button id="startBtn" class="btn btn-primary">
                         ▶️ Start
                     </button>
+                    <button id="continueScanningBtn" class="btn btn-secondary" style="display: none;">
+                        ▶️ Continue Scanning
+                    </button>
+                    <button id="scanNextBatchBtn" class="btn btn-secondary" style="display: none;">
+                        📥 Scan Next Batch
+                    </button>
                     <button id="pauseBtn" class="btn btn-warning" disabled>
                         ⏸️ Pause
                     </button>
@@ -523,6 +533,16 @@
                     <div class="stat-card">
                         <div class="stat-value" id="skippedComments">0</div>
                         <div class="stat-label">Skipped</div>
+                    </div>
+                </div>
+                
+                <div id="scanProgressContainer" style="display: none; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #65676b; margin-bottom: 8px;">
+                        <span id="scanProgressText">Scanning comments...</span>
+                        <span id="scanProgressCount">0 found</span>
+                    </div>
+                    <div class="progress-bar" style="height: 6px;">
+                        <div class="progress-fill" id="scanProgressFill" style="background: #42b883;"></div>
                     </div>
                 </div>
                 

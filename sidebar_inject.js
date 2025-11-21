@@ -25,7 +25,7 @@
         panel.id = PANEL_ID;
         const hdr = document.createElement('div');
         hdr.className = 'hdr';
-        hdr.innerHTML = `<span>FB Invite & Smart Replies</span><div><button class="btn" id="_fb_sr_close">Close</button></div>`;
+        hdr.innerHTML = `<span>FB Invite & Smart Replies-V3</span><div><button class="btn" id="_fb_sr_close">Close</button></div>`;
         const iframe = document.createElement('iframe');
         iframe.src = chrome.runtime.getURL('popup.html#reply,embed');
         panel.appendChild(hdr);

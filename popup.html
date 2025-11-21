@@ -1281,7 +1281,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>FB Invite & Smart Replies</h1>
+            <h1>FB Invite & Smart Replies-V3</h1>
             <p>Automate your Facebook engagement</p>
         </div>
         
@@ -1521,7 +1521,9 @@
                                     ✨ Generate All Replies (<span id="commentCount">0</span>)
                                 </button>
                                 <div id="scanStatus" class="status info" style="margin-top: 8px; display: none;">
-                                    Scanning for comments...
+                                    <span id="scanStatusText">Scanning for comments...</span>
+                                    <span id="commentsFoundText" style="margin-left: 12px; font-weight: 600; color: #42b883;"></span>
+                                    <button id="stopScanBtn" class="btn btn-danger btn-small" style="margin-left: 12px; display: none;">Stop</button>
                                 </div>
                             </div>
                             

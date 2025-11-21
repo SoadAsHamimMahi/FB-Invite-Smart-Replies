@@ -14,6 +14,10 @@ class ManualReplyController {
         this.isBatchGenerating = false;
         this.batchCancelRequested = false;
         
+        // Scan cancellation
+        this.isScanning = false;
+        this.scanCancelRequested = false;
+        
         // Session fallback state (not persisted across browser restarts)
         this.sessionFallbackActive = false;  // Track if fallback is active for session
         this.fallbackReason = null;          // Store reason for fallback
@@ -273,6 +277,14 @@ class ManualReplyController {
         document.getElementById('refreshComments').addEventListener('click', () => {
             this.refreshComments();
         });
+        
+        // Stop scan button
+        const stopScanBtn = document.getElementById('stopScanBtn');
+        if (stopScanBtn) {
+            stopScanBtn.addEventListener('click', () => {
+                this.stopScan();
+            });
+        }
 
         // Batch Generation
         document.getElementById('generateAllBtn').addEventListener('click', () => {
@@ -952,16 +964,37 @@ class ManualReplyController {
             return;
         }
         
+        // Reset cancellation flag
+        this.scanCancelRequested = false;
+        this.isScanning = true;
+        
+        // Clear cancellation flag in storage
+        try {
+            await chrome.storage.local.set({ scanCancelled: false });
+        } catch(e) {
+            console.error('Error clearing cancellation flag:', e);
+        }
+        
         try {
             // Check if we're on Facebook
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab.url || !tab.url.includes('facebook.com')) {
                 this.showStatus('Please navigate to a Facebook post first', 'error');
+                this.isScanning = false;
                 return;
             }
             
             this.showScanStatus('Initializing scanner...');
             this.showScanProgress && this.showScanProgress();
+            
+            // Check for cancellation before script injection
+            if (this.scanCancelRequested) {
+                this.hideScanStatus();
+                this.hideScanProgress && this.hideScanProgress();
+                this.isScanning = false;
+                this.showStatus('Scan cancelled', 'info');
+                return;
+            }
             
             // Inject content script for comment detection
             await chrome.scripting.executeScript({
@@ -969,16 +1002,38 @@ class ManualReplyController {
                 files: ['reply_content.js']
             });
             
+            // Check for cancellation after script injection
+            if (this.scanCancelRequested) {
+                this.hideScanStatus();
+                this.hideScanProgress && this.hideScanProgress();
+                this.isScanning = false;
+                this.showStatus('Scan cancelled', 'info');
+                return;
+            }
+            
             // Determine target count from UI, default to 'all'
             const maxSel = document.getElementById('maxComments');
             const maxVal = (maxSel && maxSel.value) ? maxSel.value : 'all';
             const autoEl = document.getElementById('autoLoadMore');
             const autoLoad = autoEl ? (autoEl.checked !== false) : true;
             
+            // Track comments found count
+            let commentsFoundCount = 0;
+            
             // Listen for progress updates during this scan
             const progressHandler = (message) => {
-                if (message && message.type === 'SCAN_PROGRESS' && this.updateScanProgress) {
-                    this.updateScanProgress(message.current || 0, message.total || 0);
+                if (message && message.type === 'SCAN_PROGRESS') {
+                    const current = message.current || 0;
+                    const target = message.total || 0;
+                    
+                    // Update comments found count
+                    commentsFoundCount = current;
+                    this.updateCommentsFoundText(commentsFoundCount, target);
+                    
+                    // Update progress if method exists
+                    if (this.updateScanProgress) {
+                        this.updateScanProgress(current, target);
+                    }
                 }
             };
             chrome.runtime.onMessage.addListener(progressHandler);
@@ -986,12 +1041,21 @@ class ManualReplyController {
             // Request progressive scan (can exceed 25 by auto-loading)
             let response;
             try {
+                // Check for cancellation before sending message
+                if (this.scanCancelRequested) {
+                    throw new Error('Scan cancelled by user');
+                }
+                
                 response = await chrome.tabs.sendMessage(tab.id, {
                     type: 'SCAN_COMMENTS',
                     maxComments: maxVal,
                     autoLoad: autoLoad
                 });
             } catch (e) {
+                // If cancelled, don't fallback
+                if (this.scanCancelRequested) {
+                    throw new Error('Scan cancelled by user');
+                }
                 // Fallback to legacy minimal context if progressive not available
                 response = await chrome.tabs.sendMessage(tab.id, { type: 'MSG_GET_CONTEXT' });
             } finally {
@@ -999,14 +1063,88 @@ class ManualReplyController {
                 chrome.runtime.onMessage.removeListener(progressHandler);
             }
             
+            // Check for cancellation after receiving response
+            // BUT first check if we have partial results to display
+            const hasPartialResults = response && response.success && response.data && 
+                                     response.data.comments && response.data.comments.length > 0;
+            
+            if (this.scanCancelRequested) {
+                this.isScanning = false;
+                if (hasPartialResults) {
+                    // Display partial results even if cancelled
+                    const comments = response.data.comments;
+                    this.displayComments(comments);
+                    this.updateScanButtons();
+                    this.hideScanStatus();
+                    this.hideScanProgress && this.hideScanProgress();
+                    this.showStatus(`Scan stopped. Found ${comments.length} comments. You can generate replies now.`, 'info');
+                } else {
+                    this.hideScanStatus();
+                    this.hideScanProgress && this.hideScanProgress();
+                    this.showStatus('Scan cancelled', 'info');
+                    this.displayNoComments();
+                    this.updateScanButtons();
+                }
+                return;
+            }
+            
+            // Check if response indicates cancellation
+            if (response && response.error && response.error.includes('cancelled')) {
+                this.isScanning = false;
+                if (hasPartialResults) {
+                    // Display partial results even if error indicates cancellation
+                    const comments = response.data.comments;
+                    this.displayComments(comments);
+                    this.updateScanButtons();
+                    this.hideScanStatus();
+                    this.hideScanProgress && this.hideScanProgress();
+                    this.showStatus(`Scan stopped. Found ${comments.length} comments. You can generate replies now.`, 'info');
+                } else {
+                    this.hideScanStatus();
+                    this.hideScanProgress && this.hideScanProgress();
+                    this.showStatus('Scan cancelled', 'info');
+                    this.displayNoComments();
+                    this.updateScanButtons();
+                }
+                return;
+            }
+            
+            // Process successful response
             if (response && response.success && response.data && response.data.comments) {
                 const comments = response.data.comments;
-                this.displayComments(comments);
-                this.updateScanButtons();
-                this.hideScanStatus();
+                const wasCancelled = response.data.cancelled === true;
+                
+                // ALWAYS display comments if they exist
+                if (comments.length > 0) {
+                    this.displayComments(comments);
+                    this.updateScanButtons(); // Enable Generate button
+                    
+                    // Show final count before hiding
+                    this.updateCommentsFoundText(comments.length, 0);
+                    
+                    if (wasCancelled) {
+                        this.showScanStatus(`Scan stopped. Found ${comments.length} comments.`);
+                        this.showStatus(`Scan stopped. Found ${comments.length} comments. You can generate replies now.`, 'info');
+                    } else {
+                        this.showScanStatus(`Scan complete! Found ${comments.length} comments.`);
+                        this.showStatus(`Found ${this.comments.length} comments!`, 'success');
+                    }
+                    
+                    // Hide after a moment
+                    setTimeout(() => {
+                        this.hideScanStatus();
+                    }, 2000);
+                } else {
+                    // No comments found
+                    this.hideScanStatus();
+                    this.showStatus(wasCancelled ? 'Scan stopped - no comments found' : 'No comments found on this page', wasCancelled ? 'info' : 'error');
+                    this.displayNoComments();
+                }
+                
                 this.hideScanProgress && this.hideScanProgress();
-                this.showStatus(`Found ${this.comments.length} comments!`, 'success');
+                this.updateScanButtons(); // Always update buttons
             } else {
+                // No response or no comments in response
                 this.hideScanStatus();
                 this.hideScanProgress && this.hideScanProgress();
                 this.showStatus('No comments found on this page', 'error');
@@ -1018,8 +1156,68 @@ class ManualReplyController {
             console.error('Scan comments error:', error);
             this.hideScanStatus();
             this.hideScanProgress && this.hideScanProgress();
-            this.showStatus('Error scanning comments: ' + error.message, 'error');
-            this.displayNoComments();
+            
+            // Check if error is due to cancellation
+            const isCancelled = this.scanCancelRequested || 
+                               (error && error.message && error.message.includes('cancelled')) ||
+                               (response && response.error && response.error.includes('cancelled'));
+            
+            // Check if we have partial results in the response
+            if (response && response.success && response.data && response.data.comments && response.data.comments.length > 0) {
+                const comments = response.data.comments;
+                this.displayComments(comments);
+                this.updateScanButtons();
+                this.showStatus(`Scan stopped. Found ${comments.length} comments. You can generate replies now.`, 'info');
+            } else if (isCancelled) {
+                this.showStatus('Scan cancelled', 'info');
+                this.displayNoComments();
+            } else {
+                this.showStatus('Error scanning comments: ' + (error?.message || 'Unknown error'), 'error');
+                this.displayNoComments();
+            }
+            this.updateScanButtons();
+        } finally {
+            this.isScanning = false;
+            // Clear cancellation flag
+            try {
+                await chrome.storage.local.set({ scanCancelled: false });
+            } catch(e) {
+                // Ignore
+            }
+        }
+    }
+    
+    async stopScan() {
+        if (this.isScanning) {
+            this.scanCancelRequested = true;
+            
+            // Set cancellation flag in storage so content script can check it
+            try {
+                await chrome.storage.local.set({ 
+                    scanCancelled: true 
+                });
+            } catch(e) {
+                console.error('Error setting cancellation flag:', e);
+            }
+            
+            // Also try to send a message to the content script if possible
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab && tab.id) {
+                    chrome.tabs.sendMessage(tab.id, { 
+                        type: 'CANCEL_SCAN' 
+                    }).catch(() => {
+                        // Content script might not be ready, that's okay
+                    });
+                }
+            } catch(e) {
+                // Tab might not be available, that's okay
+            }
+            
+            this.hideScanStatus();
+            this.hideScanProgress && this.hideScanProgress();
+            this.isScanning = false;
+            this.showStatus('Scan cancelled', 'info');
             this.updateScanButtons();
         }
     }
@@ -1030,13 +1228,56 @@ class ManualReplyController {
     
     showScanStatus(message) {
         const statusEl = document.getElementById('scanStatus');
-        statusEl.textContent = message;
-        statusEl.style.display = 'block';
+        const statusTextEl = document.getElementById('scanStatusText');
+        const stopBtn = document.getElementById('stopScanBtn');
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            if (statusTextEl) {
+                statusTextEl.textContent = message || 'Scanning for comments...';
+            } else {
+                statusEl.textContent = message || 'Scanning for comments...';
+            }
+            // Show stop button if scanning is in progress
+            if (stopBtn) {
+                if (this.isScanning) {
+                    stopBtn.style.display = 'inline-block';
+                } else {
+                    stopBtn.style.display = 'none';
+                }
+            }
+        }
+        // Reset comments found count
+        this.updateCommentsFoundText(0, 0);
     }
     
     hideScanStatus() {
         const statusEl = document.getElementById('scanStatus');
-        statusEl.style.display = 'none';
+        const stopBtn = document.getElementById('stopScanBtn');
+        if (statusEl) {
+            statusEl.style.display = 'none';
+        }
+        if (stopBtn) {
+            stopBtn.style.display = 'none';
+        }
+        // Clear comments found text
+        this.updateCommentsFoundText(0, 0);
+    }
+    
+    updateCommentsFoundText(current, target) {
+        const commentsFoundEl = document.getElementById('commentsFoundText');
+        if (commentsFoundEl) {
+            if (current > 0) {
+                if (target > 0) {
+                    commentsFoundEl.textContent = `📊 ${current} / ${target} comments found`;
+                } else {
+                    commentsFoundEl.textContent = `📊 ${current} comments found`;
+                }
+                commentsFoundEl.style.display = 'inline';
+            } else {
+                commentsFoundEl.textContent = '';
+                commentsFoundEl.style.display = 'none';
+            }
+        }
     }
     
     displayComments(comments) {

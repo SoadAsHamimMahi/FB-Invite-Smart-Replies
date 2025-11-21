@@ -18,6 +18,15 @@ class ReplyController {
         };
         this.dailyUsage = 0;
         
+        // Batch tracking properties
+        this.currentBatch = 0;
+        this.batchSize = 50; // Default batch size (50 for first scan)
+        this.totalBatches = 0; // Estimated
+        this.allComments = []; // Accumulated across batches
+        this.hasMoreBatches = false; // Whether more batches are available
+        this.isScanningBatch = false; // Whether currently scanning a batch
+        this.scanProgressListener = null; // Listener for scan progress updates
+        
         this.init();
     }
     
@@ -70,6 +79,14 @@ class ReplyController {
         // Control buttons
         document.getElementById('startBtn').addEventListener('click', () => {
             this.start();
+        });
+        
+        document.getElementById('scanNextBatchBtn').addEventListener('click', () => {
+            this.scanNextBatch();
+        });
+        
+        document.getElementById('continueScanningBtn').addEventListener('click', () => {
+            this.continueScanning();
         });
         
         document.getElementById('pauseBtn').addEventListener('click', () => {
@@ -158,36 +175,308 @@ class ReplyController {
         
         this.isRunning = true;
         this.isPaused = false;
+        this.currentBatch = 0;
+        this.allComments = [];
+        this.hasMoreBatches = false;
+        this.isScanningBatch = false;
         this.updateButtons();
         
         try {
             // Inject content script if not already present
             await this.ensureContentScript();
             
-            // Get post context
+            // Get initial post context (caption and images)
             this.log('Getting post context...', 'info');
-            this.postContext = await this.getPostContext();
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const initialResponse = await chrome.tabs.sendMessage(tab.id, {
+                type: 'MSG_GET_CONTEXT'
+            });
             
-            if (!this.postContext || !this.postContext.comments || this.postContext.comments.length === 0) {
-                this.showStatus('No comments found on this post', 'error');
-                this.stop();
-                return;
+            if (initialResponse && initialResponse.success) {
+                this.postContext = {
+                    caption: initialResponse.data.caption,
+                    images: initialResponse.data.images,
+                    comments: []
+                };
+            } else {
+                throw new Error('Failed to get post context');
             }
             
-            this.comments = this.postContext.comments;
-            this.stats.total = this.comments.length;
-            this.updateStats();
-            
-            this.log(`Found ${this.stats.total} comments to process`, 'success');
-            this.showStatus(`Processing ${this.stats.total} comments...`, 'info');
-            
-            // Process comments
-            await this.processComments();
+            // Scan first batch
+            await this.scanNextBatch();
             
         } catch (error) {
             console.error('Start error:', error);
             this.log(`Error: ${error.message}`, 'error');
             this.stop();
+        }
+    }
+    
+    async scanNextBatch() {
+        if (this.isScanningBatch) {
+            this.log('Already scanning a batch, please wait...', 'warning');
+            return;
+        }
+        
+        this.isScanningBatch = true;
+        this.currentBatch++;
+        this.log(`Scanning batch ${this.currentBatch}...`, 'info');
+        this.updateButtons();
+        this.showScanProgress();
+        
+        // Clear any existing continue scanning flags
+        try {
+            chrome.storage.local.set({ 
+                continueScanning: false,
+                showContinueScanning: false
+            });
+        } catch(_) {}
+        
+        // Set up progress listener
+        this.scanProgressListener = (message) => {
+            if (message && message.type === 'SCAN_PROGRESS') {
+                this.updateScanProgress(message.current || 0, message.target || this.batchSize);
+            }
+        };
+        
+        // Set up continue scanning button listener (check storage immediately and on changes)
+        this.checkContinueScanningFlag();
+        
+        chrome.runtime.onMessage.addListener(this.scanProgressListener);
+        
+        // Listen for storage changes with better error handling
+        this.storageListener = (changes, areaName) => {
+            if (areaName === 'local' && changes.showContinueScanning) {
+                if (changes.showContinueScanning.newValue === true) {
+                    this.log('Storage change detected: showing Continue Scanning button', 'info');
+                    this.showContinueScanningButton();
+                } else if (changes.showContinueScanning.newValue === false) {
+                    this.hideContinueScanningButton();
+                }
+            }
+        };
+        chrome.storage.onChanged.addListener(this.storageListener);
+        
+        // Also poll storage periodically as backup (in case change event doesn't fire)
+        this.storagePollInterval = setInterval(() => {
+            this.checkContinueScanningFlag();
+        }, 1000);
+        
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const response = await chrome.tabs.sendMessage(tab.id, {
+                type: 'SCAN_COMMENTS',
+                maxComments: 'all',
+                autoLoad: true,
+                batchSize: this.batchSize,
+                batchNumber: this.currentBatch
+            });
+            
+            if (response && response.success && response.data) {
+                const batchComments = response.data.comments || [];
+                const batchNumber = response.data.batchNumber || this.currentBatch;
+                this.hasMoreBatches = response.data.hasMore === true;
+                
+                // Deduplicate against already collected comments
+                const seen = new Set(this.allComments.map(c => `${c.user}_${(c.text||'').substring(0,50)}`));
+                let added = 0;
+                for (const comment of batchComments) {
+                    const k = `${comment.user}_${(comment.text||'').substring(0,50)}`;
+                    if (!seen.has(k)) {
+                        seen.add(k);
+                        this.allComments.push(comment);
+                        added++;
+                    }
+                }
+                
+                this.log(`Batch ${batchNumber}: Found ${batchComments.length} comments (${added} new)`, 'success');
+                
+                // Update total
+                this.comments = this.allComments;
+                this.stats.total = this.allComments.length;
+                
+                // Estimate total batches
+                if (this.hasMoreBatches) {
+                    this.totalBatches = Math.ceil((response.data.totalScanned || this.allComments.length) / this.batchSize) + 1;
+                } else {
+                    this.totalBatches = this.currentBatch;
+                }
+                
+                this.updateStats();
+                this.updateButtons();
+                
+                // Process new comments from this batch
+                if (this.isRunning) {
+                    await this.processComments();
+                }
+                
+                if (!this.hasMoreBatches) {
+                    this.log(`All batches scanned. Total: ${this.allComments.length} comments`, 'success');
+                } else {
+                    this.log(`Batch ${batchNumber} complete. Click "Scan Next Batch" to continue.`, 'info');
+                }
+            } else {
+                this.log(`Failed to scan batch ${this.currentBatch}: ${response?.error || 'Unknown error'}`, 'error');
+                this.hasMoreBatches = false;
+                this.updateButtons();
+            }
+        } catch (error) {
+            console.error('Batch scanning error:', error);
+            this.log(`Error scanning batch ${this.currentBatch}: ${error.message}`, 'error');
+            this.hasMoreBatches = false;
+            this.updateButtons();
+        } finally {
+            // Remove progress listener
+            if (this.scanProgressListener) {
+                chrome.runtime.onMessage.removeListener(this.scanProgressListener);
+                this.scanProgressListener = null;
+            }
+            // Remove storage listener
+            if (this.storageListener) {
+                chrome.storage.onChanged.removeListener(this.storageListener);
+                this.storageListener = null;
+            }
+            // Clear storage polling interval
+            if (this.storagePollInterval) {
+                clearInterval(this.storagePollInterval);
+                this.storagePollInterval = null;
+            }
+            this.hideContinueScanningButton();
+            this.hideScanProgress();
+            this.isScanningBatch = false;
+        }
+    }
+    
+    showContinueScanningButton() {
+        const btn = document.getElementById('continueScanningBtn');
+        if (btn) {
+            btn.style.display = 'inline-flex';
+            btn.disabled = false;
+            this.log('Click "Continue Scanning" to proceed after loading comments...', 'info');
+        }
+    }
+    
+    hideContinueScanningButton() {
+        const btn = document.getElementById('continueScanningBtn');
+        if (btn) {
+            btn.style.display = 'none';
+            btn.disabled = true;
+        }
+    }
+    
+    async checkContinueScanningFlag() {
+        try {
+            const result = await chrome.storage.local.get(['showContinueScanning', 'continueScanningBatch']);
+            if (result.showContinueScanning === true) {
+                const batchNum = result.continueScanningBatch || this.currentBatch;
+                if (batchNum === this.currentBatch) {
+                    this.showContinueScanningButton();
+                }
+            }
+        } catch(e) {
+            console.warn('Error checking continue scanning flag:', e);
+        }
+    }
+    
+    continueScanning() {
+        // Set flag in storage to signal content script to continue
+        chrome.storage.local.set({ 
+            continueScanning: true,
+            showContinueScanning: false 
+        }).then(() => {
+            this.hideContinueScanningButton();
+            this.log('Continuing scan...', 'info');
+        }).catch((e) => {
+            this.log(`Error setting continue flag: ${e.message}`, 'error');
+        });
+    }
+    
+    showScanProgress() {
+        const container = document.getElementById('scanProgressContainer');
+        if (container) {
+            container.style.display = 'block';
+            this.updateScanProgress(0, this.batchSize);
+        }
+    }
+    
+    hideScanProgress() {
+        const container = document.getElementById('scanProgressContainer');
+        if (container) {
+            container.style.display = 'none';
+        }
+    }
+    
+    updateScanProgress(current, target) {
+        const progressFill = document.getElementById('scanProgressFill');
+        const progressText = document.getElementById('scanProgressText');
+        const progressCount = document.getElementById('scanProgressCount');
+        
+        if (progressFill && progressText && progressCount) {
+            const percentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `Scanning batch ${this.currentBatch}...`;
+            progressCount.textContent = `${current} found`;
+        }
+    }
+    
+    async processComments() {
+        // Process all unprocessed comments
+        const commentsToProcess = this.allComments.slice(this.stats.processed);
+        
+        for (const comment of commentsToProcess) {
+            if (!this.isRunning) break;
+            if (this.isPaused) {
+                await this.waitForResume();
+            }
+            
+            const commentId = `${comment.user}_${comment.text.substring(0, 50)}`;
+            
+            // Skip if already processed
+            if (this.processedComments.has(commentId)) {
+                continue;
+            }
+            
+            // Check if we've already replied to this user (if enabled)
+            if (document.getElementById('replyOncePerUser').checked && 
+                this.repliedUsers.has(comment.user)) {
+                this.stats.skipped++;
+                this.log(`Skipped ${comment.user} (already replied)`, 'warning');
+                this.updateStats();
+                this.processedComments.add(commentId);
+                continue;
+            }
+            
+            // Check relevance
+            const relevance = document.getElementById('relevance').value;
+            if (!this.looksRelevant(this.postContext.caption, comment.text, relevance)) {
+                this.stats.skipped++;
+                this.log(`Skipped ${comment.user} (low relevance)`, 'warning');
+                this.updateStats();
+                this.processedComments.add(commentId);
+                continue;
+            }
+            
+            try {
+                await this.processComment(comment);
+                this.processedComments.add(commentId);
+                this.stats.processed++;
+                this.updateStats();
+                
+                // Wait between replies
+                if (this.isRunning) {
+                    const delay = this.getRandomDelay();
+                    this.log(`Waiting ${delay/1000}s before next reply...`, 'info');
+                    await this.sleep(delay);
+                }
+                
+            } catch (error) {
+                console.error('Process comment error:', error);
+                this.log(`Error processing ${comment.user}: ${error.message}`, 'error');
+            }
+        }
+        
+        if (this.isRunning && this.stats.processed >= this.stats.total) {
+            this.log('Finished processing all scanned comments', 'success');
         }
     }
     
@@ -212,8 +501,13 @@ class ReplyController {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             
+            // Use batch scanning for better performance
             const response = await chrome.tabs.sendMessage(tab.id, {
-                type: 'MSG_GET_CONTEXT'
+                type: 'SCAN_COMMENTS',
+                maxComments: 'all',
+                autoLoad: true,
+                batchSize: this.batchSize,
+                batchNumber: this.currentBatch + 1
             });
             
             if (response && response.success) {
@@ -489,6 +783,8 @@ class ReplyController {
     stop() {
         this.isRunning = false;
         this.isPaused = false;
+        this.hasMoreBatches = false;
+        this.isScanningBatch = false;
         this.updateButtons();
         this.log('Stopped', 'info');
         this.saveDailyUsage();
@@ -496,6 +792,7 @@ class ReplyController {
     
     updateButtons() {
         const startBtn = document.getElementById('startBtn');
+        const scanNextBatchBtn = document.getElementById('scanNextBatchBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
         
@@ -503,6 +800,15 @@ class ReplyController {
             startBtn.disabled = true;
             pauseBtn.disabled = false;
             stopBtn.disabled = false;
+            
+            // Show/hide scan next batch button
+            if (this.hasMoreBatches && !this.isScanningBatch) {
+                scanNextBatchBtn.style.display = 'inline-flex';
+                scanNextBatchBtn.disabled = false;
+            } else {
+                scanNextBatchBtn.style.display = 'none';
+                scanNextBatchBtn.disabled = true;
+            }
             
             if (this.isPaused) {
                 pauseBtn.textContent = '▶️ Resume';
@@ -515,6 +821,8 @@ class ReplyController {
             startBtn.disabled = false;
             pauseBtn.disabled = true;
             stopBtn.disabled = true;
+            scanNextBatchBtn.style.display = 'none';
+            scanNextBatchBtn.disabled = true;
             pauseBtn.textContent = '⏸️ Pause';
             pauseBtn.onclick = () => this.pause();
         }
@@ -528,8 +836,18 @@ class ReplyController {
         
         const progress = this.stats.total > 0 ? (this.stats.processed / this.stats.total) * 100 : 0;
         document.getElementById('progressFill').style.width = `${progress}%`;
-        document.getElementById('progressText').textContent = 
-            `${this.stats.processed}/${this.stats.total} processed`;
+        
+        // Update progress text with batch information
+        if (this.currentBatch > 0) {
+            const batchInfo = this.totalBatches > 0 
+                ? `Batch ${this.currentBatch}/${this.totalBatches} - ` 
+                : `Batch ${this.currentBatch} - `;
+            document.getElementById('progressText').textContent = 
+                `${batchInfo}${this.stats.processed}/${this.stats.total} processed`;
+        } else {
+            document.getElementById('progressText').textContent = 
+                `${this.stats.processed}/${this.stats.total} processed`;
+        }
     }
     
     log(message, type = 'info') {
