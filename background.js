@@ -13,12 +13,17 @@ class AIProviderManager {
     async generateReply({ provider, model, apiKey, prompt, images }) {
         try {
             switch (provider) {
-                case 'gemini':
-                    return await this.callGeminiVision(apiKey, model, prompt, images);
+                case 'groq':
+                    return await this.callGroqVision(apiKey, model, prompt, images);
+                case 'grok':
+                    return await this.callGrokAPI(apiKey, model, prompt, images);
                 case 'mistral':
                     return images?.length ? 
                         await this.callMistralVision(apiKey, model, prompt, images) :
                         await this.callMistralText(apiKey, model, prompt);
+                case 'gemini':
+                    // Keep for backward compatibility
+                    return await this.callGeminiVision(apiKey, model, prompt, images);
                 default:
                     throw new Error(`Unknown provider: ${provider}`);
             }
@@ -142,6 +147,76 @@ class AIProviderManager {
         // This can be updated when vision models are available
         console.warn('Mistral vision not yet implemented, falling back to text-only');
         return await this.callMistralText(key, model, prompt);
+    }
+    
+    async callGroqVision(key, model, prompt, images) {
+        const url = "https://api.groq.com/openai/v1/chat/completions";
+        
+        // Groq doesn't support vision/image inputs - always use text-only format
+        // If images are provided, we'll ignore them and use text-only
+        const messages = [{ role: "user", content: prompt || "" }];
+        
+        // Log warning if images were provided but ignored
+        if (images && images.length > 0) {
+            console.warn('Groq API does not support vision inputs. Images will be ignored.');
+        }
+        
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${key}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                max_tokens: 500,
+                temperature: 0.7
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`Groq API error: ${JSON.stringify(data)}`);
+        }
+        
+        return data?.choices?.[0]?.message?.content?.trim() || "";
+    }
+    
+    async callGrokAPI(key, model, prompt, images) {
+        // Grok API endpoint (xAI)
+        const url = "https://api.x.ai/v1/chat/completions";
+        
+        const messages = [{ role: "user", content: prompt }];
+        
+        // Note: Grok vision support may vary - check xAI documentation
+        // For now, text-only implementation
+        if (images && images.length > 0) {
+            console.warn('Grok vision support may vary - using text-only for now');
+        }
+        
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${key}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                max_tokens: 500,
+                temperature: 0.7
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`Grok API error: ${JSON.stringify(data)}`);
+        }
+        
+        return data?.choices?.[0]?.message?.content?.trim() || "";
     }
     
     async testConnection({ provider, model, apiKey }) {

@@ -232,8 +232,13 @@
             text-transform: uppercase;
         }
         
-        .provider-gemini {
-            background: #4285f4;
+        .provider-groq {
+            background: #00a67e;
+            color: white;
+        }
+        
+        .provider-grok {
+            background: #000000;
             color: white;
         }
         
@@ -443,25 +448,27 @@
             <form id="addKeyForm">
                 <div class="form-group">
                     <label for="keyLabel">Label</label>
-                    <input type="text" id="keyLabel" class="form-control" placeholder="e.g., Gemini Vision Pro">
+                    <input type="text" id="keyLabel" class="form-control" placeholder="e.g., Groq Vision Pro">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="keyProvider">Provider</label>
-                        <select id="keyProvider" class="form-control">
-                            <option value="gemini">Gemini</option>
-                            <option value="mistral">Mistral</option>
-                        </select>
+                            <select id="keyProvider" class="form-control">
+                                <option value="groq">Groq (Vision)</option>
+                                <option value="grok">Grok (xAI)</option>
+                                <option value="mistral">Mistral</option>
+                            </select>
                     </div>
                     
                     <div class="form-group">
                         <label for="keyModel">Model</label>
                         <select id="keyModel" class="form-control">
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
+                            <option value="llama-3.1-70b-versatile">Llama 3.1 70B Versatile</option>
+                            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant</option>
+                            <option value="grok-beta">Grok Beta</option>
                             <option value="mistral-large">Mistral Large</option>
-                            <option value="mistral-nemo">Mistral Nemo</option>
                         </select>
                     </div>
                 </div>

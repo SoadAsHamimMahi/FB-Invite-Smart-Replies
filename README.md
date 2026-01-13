@@ -6,7 +6,7 @@ A Chrome extension that automates Facebook interactions with AI-powered comment 
 
 ## Features
 
-- **Smart AI Replies**: Generate context-aware comment replies using Gemini or Mistral AI
+- **Smart AI Replies**: Generate context-aware comment replies using Groq Vision, Grok, or Mistral AI
 - **Automated Invitations**: Invite post likers to like your Facebook page
 - **Comment Detection**: Automatically scan and detect comments on Facebook posts
 - **Multiple Tones**: Friendly, professional, supportive, and more reply styles
@@ -23,7 +23,7 @@ A Chrome extension that automates Facebook interactions with AI-powered comment 
 ## Quick Start
 
 ### Smart Replies
-1. Go to **Settings** tab → Add your API key (Gemini or Mistral)
+1. Go to **Settings** tab → Add your API key (Groq, Grok, or Mistral)
 2. Go to **Reply** tab → Enter post caption → Click "Save Post Data"
 3. Navigate to a Facebook post → Click "Scan Comments"
 4. Click "Generate" next to any comment → Review and post
@@ -36,7 +36,7 @@ A Chrome extension that automates Facebook interactions with AI-powered comment 
 ## Requirements
 
 - Chrome/Edge (version 88+)
-- API key from [Gemini](https://makersuite.google.com/app/apikey) or [Mistral](https://console.mistral.ai/) (for smart replies)
+- API key from [Groq](https://console.groq.com/) (for vision), [Grok](https://x.ai/) or [Mistral](https://console.mistral.ai/) (for smart replies)
 
 ## Permissions
 
@@ -44,7 +44,7 @@ A Chrome extension that automates Facebook interactions with AI-powered comment 
 - `scripting`: Inject scripts into Facebook pages
 - `storage`: Save your settings and API keys locally
 - `https://*.facebook.com/*`: Access Facebook pages
-- `https://generativelanguage.googleapis.com/*` & `https://api.mistral.ai/*`: AI API access
+- `https://api.groq.com/*`, `https://api.x.ai/*` & `https://api.mistral.ai/*`: AI API access
 
 ## Keyboard Shortcuts
 

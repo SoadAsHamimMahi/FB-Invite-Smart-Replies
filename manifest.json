@@ -21,8 +21,9 @@
   "permissions": [ "storage", "activeTab", "scripting", "alarms" ],
   "host_permissions": [
     "https://*.facebook.com/*",
-    "https://generativelanguage.googleapis.com/*",
-    "https://api.mistral.ai/*"
+    "https://api.mistral.ai/*",
+    "https://api.groq.com/*",
+    "https://api.x.ai/*"
   ],
   "permissions": [
     "storage",

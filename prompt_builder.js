@@ -5,6 +5,66 @@
  * @param {string} tone - The tone type
  * @returns {string} Tone-specific instructions
  */
+/**
+ * Detects the tone of a comment and maps it to an appropriate reply tone
+ * @param {string} commentText - The comment text to analyze
+ * @returns {string} Detected tone (friendly, enthusiastic, empathetic, etc.)
+ */
+export function detectCommentTone(commentText) {
+    if (!commentText) return 'friendly';
+    
+    const text = commentText.toLowerCase();
+    
+    // Happy/Positive indicators
+    const happyPatterns = ['😊', '😄', '😃', '😁', '😍', '❤️', '💕', '🎉', '🎊', 'awesome', 'amazing', 'love', 'great', 'wonderful', 'fantastic', 'excellent', 'perfect', 'best', 'beautiful', 'gorgeous', 'stunning', 'incredible', 'brilliant', 'outstanding', 'superb', 'marvelous', 'delightful', 'joy', 'happy', 'happiness', 'excited', 'excitement', 'thrilled', 'ecstatic', 'overjoyed', 'blissful', 'cheerful', 'glad', 'pleased', 'satisfied', 'grateful', 'thankful', 'appreciate', 'appreciation'];
+    
+    // Sad/Negative indicators
+    const sadPatterns = ['😢', '😭', '😔', '😞', '😟', '😕', '😰', '😨', '😓', 'sad', 'sadness', 'unhappy', 'disappointed', 'disappointment', 'upset', 'hurt', 'pain', 'suffering', 'struggling', 'difficult', 'hard', 'tough', 'challenging', 'problem', 'issue', 'concern', 'worry', 'worried', 'anxious', 'anxiety', 'stress', 'stressed', 'depressed', 'depression', 'lonely', 'loneliness', 'miss', 'missing', 'loss', 'lost', 'grief', 'grieving', 'mourning'];
+    
+    // Question indicators
+    const questionPatterns = ['?', 'how', 'what', 'when', 'where', 'why', 'who', 'which', 'can', 'could', 'would', 'should', 'may', 'might', 'help', 'question', 'wonder', 'curious', 'curiosity', 'ask', 'asking', 'inquire', 'inquiry'];
+    
+    // Compliment indicators
+    const complimentPatterns = ['compliment', 'praise', 'admire', 'admiration', 'impressed', 'impressive', 'respect', 'respectful', 'appreciate', 'appreciation', 'grateful', 'thank', 'thanks', 'thankful', 'beautiful', 'gorgeous', 'stunning', 'amazing', 'wonderful', 'excellent', 'perfect', 'best', 'great', 'awesome', 'fantastic', 'brilliant', 'outstanding', 'superb', 'marvelous', 'delightful', 'love', 'adore', 'cherish', 'treasure', 'valuable', 'precious'];
+    
+    // Complaint indicators
+    const complaintPatterns = ['complaint', 'complain', 'problem', 'issue', 'wrong', 'bad', 'terrible', 'awful', 'horrible', 'worst', 'disappointed', 'disappointment', 'dissatisfied', 'dissatisfaction', 'unhappy', 'upset', 'angry', 'anger', 'frustrated', 'frustration', 'annoyed', 'annoyance', 'irritated', 'irritation', 'mad', 'furious', 'outraged', 'disgusted', 'disgust', 'hate', 'dislike', 'disgusting', 'unacceptable', 'unfair', 'injustice', 'wrong', 'mistake', 'error', 'fault', 'blame', 'responsible', 'refund', 'return', 'cancel', 'cancellation'];
+    
+    // Enthusiastic indicators
+    const enthusiasticPatterns = ['!!!', '!!', '🎉', '🎊', '🔥', '💯', '🚀', '✨', '⭐', '🌟', 'excited', 'excitement', 'thrilled', 'ecstatic', 'overjoyed', 'amazing', 'awesome', 'fantastic', 'incredible', 'unbelievable', 'wow', 'omg', 'oh my god', 'yes', 'yeah', 'yay', 'hooray', 'hurray', 'bravo', 'congratulations', 'congrats', 'celebrate', 'celebration'];
+    
+    // Supportive indicators
+    const supportivePatterns = ['support', 'supportive', 'encourage', 'encouragement', 'encouraging', 'help', 'helpful', 'assist', 'assistance', 'aid', 'back', 'behind', 'stand', 'standing', 'there', 'here', 'together', 'team', 'unity', 'united', 'solidarity', 'solidarity', 'care', 'caring', 'concern', 'concerned', 'worry', 'worried', 'hope', 'hopeful', 'wish', 'wishing', 'pray', 'praying', 'believe', 'believing', 'faith', 'faithful', 'trust', 'trusting', 'confidence', 'confident'];
+    
+    // Count matches
+    let happyCount = happyPatterns.filter(p => text.includes(p)).length;
+    let sadCount = sadPatterns.filter(p => text.includes(p)).length;
+    let questionCount = questionPatterns.filter(p => text.includes(p)).length;
+    let complimentCount = complimentPatterns.filter(p => text.includes(p)).length;
+    let complaintCount = complaintPatterns.filter(p => text.includes(p)).length;
+    let enthusiasticCount = enthusiasticPatterns.filter(p => text.includes(p)).length;
+    let supportiveCount = supportivePatterns.filter(p => text.includes(p)).length;
+    
+    // Check for exclamation marks (enthusiasm)
+    const exclamationCount = (commentText.match(/!/g) || []).length;
+    if (exclamationCount >= 2) enthusiasticCount += 2;
+    
+    // Check for question marks
+    const questionMarkCount = (commentText.match(/\?/g) || []).length;
+    if (questionMarkCount >= 1) questionCount += 2;
+    
+    // Determine tone based on highest count
+    if (complaintCount > 2) return 'empathetic'; // Complaints need empathetic response
+    if (sadCount > 2) return 'empathetic'; // Sad comments need empathetic response
+    if (enthusiasticCount > 2 || happyCount > 3) return 'enthusiastic'; // Happy comments get enthusiastic reply
+    if (complimentCount > 2) return 'appreciative'; // Compliments get appreciative reply
+    if (questionCount > 2) return 'educational'; // Questions get educational reply
+    if (supportiveCount > 2) return 'supportive'; // Supportive comments get supportive reply
+    
+    // Default to friendly if no strong indicators
+    return 'friendly';
+}
+
 function getToneInstructions(tone) {
     const toneMap = {
         'friendly': 'Be warm, approachable, and conversational. Use positive language and show genuine interest.',
@@ -36,11 +96,17 @@ function getToneInstructions(tone) {
  * @returns {string} The formatted prompt for AI generation
  */
 export function buildReplyPrompt({ caption, commentText, tone, language, safety, maxLen = 220 }) {
-    const toneInstructions = getToneInstructions(tone);
+    // If tone is "auto", detect the commenter's tone first
+    let actualTone = tone;
+    if (tone === 'auto') {
+        actualTone = detectCommentTone(commentText);
+    }
+    
+    const toneInstructions = getToneInstructions(actualTone);
     
     const promptParts = [
         `You are a helpful page admin assistant for a Facebook page.`,
-        `Write ONE short reply to the comment with a ${tone} tone. Be relevant to both the POST and the COMMENT.`,
+        `Write ONE short reply to the comment with a ${actualTone} tone. Be relevant to both the POST and the COMMENT.`,
         toneInstructions,
         `Your reply should feel natural and engaging.`,
     ];
@@ -283,7 +349,7 @@ export function validatePromptParams(params) {
         errors.push('maxLen must be between 10 and 500');
     }
     
-    const validTones = ['friendly', 'funny', 'professional', 'casual', 'enthusiastic', 'supportive', 'empathetic', 'promotional', 'educational', 'appreciative'];
+    const validTones = ['auto', 'friendly', 'funny', 'professional', 'casual', 'enthusiastic', 'supportive', 'empathetic', 'promotional', 'educational', 'appreciative'];
     if (params.tone && !validTones.includes(params.tone)) {
         errors.push('Invalid tone. Must be one of: ' + validTones.join(', '));
     }

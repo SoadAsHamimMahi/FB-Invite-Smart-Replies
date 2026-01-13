@@ -4,15 +4,16 @@ class FacebookReplyExtractor {
     constructor() {
         // Updated selectors for current Facebook UI
         this.commentSelectors = [
-            '[data-testid="UFI2Comment/root_depth_0"]',
-            '[data-pagelet="CommentsUnit"] [role="article"]',
-            '[data-testid="UFI2Comment/root_depth_0"]',
-            '[role="article"] [data-testid*="comment"]',
-            'div[data-testid*="comment"]',
-            '.comment',
-            '[role="article"]',
-            'div[aria-label*="comment"]',
-            'div[data-sigil*="comment"]'
+            '[data-testid="UFI2Comment/root_depth_0"]', // Specific Facebook comment root
+            '[data-pagelet="CommentsUnit"] [role="article"]', // Only articles within comments unit
+            'div[data-testid*="UFI2Comment"]', // Any UFI2Comment element
+            'li[data-testid*="comment"]', // Comments in lists
+            'div[data-sigil*="comment"]' // Mobile/legacy structure
+            // REMOVED: '[role="article"]' - too broad, matches posts too
+            // REMOVED: '[data-testid="comment"]' - too generic
+            // REMOVED: 'div[data-testid*="comment"]' - too broad, matches post comments count
+            // REMOVED: '.comment' - too generic
+            // REMOVED: '[role="article"] [data-testid*="comment"]' - still too broad
         ];
         
         this.replyButtonSelectors = [
@@ -38,12 +39,17 @@ class FacebookReplyExtractor {
         
         this.userNameSelectors = [
             '[data-testid="UFI2Comment/author_name"]',
-            'strong a[role="link"]',
+            '[data-testid="UFI2Comment/root_depth_0"] strong a[role="link"]',
             '[data-testid="comment"] strong a',
             'a[role="link"] strong',
             'h3 a[role="link"]',
+            'h4 a[role="link"]',
             'div[data-testid*="comment"] a[role="link"]',
-            '.comment a[role="link"]'
+            '.comment a[role="link"]',
+            'span[dir="auto"] a[role="link"]',
+            'a[href*="/user/"]',
+            'a[href*="/people/"]',
+            'a[aria-label*="profile"]'
         ];
         
         this.captionSelectors = [
@@ -329,10 +335,24 @@ class FacebookReplyExtractor {
             }
             
             const section = this.findCommentsSection();
-            if (!section) return [];
+            if (!section) {
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:337',message:'extractComments: no section found - RETURNING EMPTY',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
+                this.log('No comments section found - not scanning entire page');
+                return []; // CRITICAL: Don't fall back to scanning entire document
+            }
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:342',message:'extractComments: using section',data:{sectionTag:section.tagName,sectionText:section.textContent.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
             
             // Get elements in order (top to bottom)
             const elements = this.findAllCommentElements(section);
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:348',message:'extractComments: elements found',data:{elementCount:elements.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
             
             for (const el of elements) {
                 // Check shouldStop() BEFORE processing each element (synchronous, immediate)
@@ -348,6 +368,10 @@ class FacebookReplyExtractor {
                 
                 try {
                     const c = await this.extractSingleComment(el);
+                    // Skip if extractSingleComment returns null (metadata or invalid comment)
+                    if (!c) {
+                        continue;
+                    }
                     if (c && c.user && c.text && c.text.length > 3) {
                         const k = `${c.user}_${(c.text||'').substring(0,50)}`;
                         
@@ -424,80 +448,194 @@ class FacebookReplyExtractor {
     }
     
     findCommentsSection() {
-        // Try multiple strategies to find the comments section
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:450',message:'findCommentsSection: entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
+        
+        // STRATEGY 1: Find the main post/article first, then look for comments within it
+        // This is more reliable than looking for a specific comments container
+        const postArticles = document.querySelectorAll('[role="article"]');
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:456',message:'findCommentsSection: checking articles',data:{articleCount:postArticles.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
+        
+        for (const article of postArticles) {
+            // EXCLUDE extension's own UI elements
+            const articleText = article.textContent || '';
+            if (article.closest('#reply-container, .reply-container, [id*="reply"], [class*="reply-container"], #commentsList, .comments-list') ||
+                (article.id && (article.id.includes('reply') || article.id.includes('extension'))) ||
+                article.classList.contains('comment-card') ||
+                article.classList.contains('comments-list') ||
+                articleText.includes('Page Comments') ||
+                articleText.includes('Group Comments') ||
+                articleText.includes('Scan Comments') ||
+                articleText.includes('Generate All Replies')) {
+                continue; // Skip extension UI
+            }
+            
+            // Look for comment indicators within this article
+            // Comments typically have: reply buttons, user profile links, and text content
+            const replyButtons = article.querySelectorAll('[data-testid*="reply"], [aria-label*="Reply"], [aria-label*="reply"], a[href*="comment"], button[aria-label*="Reply"]');
+            const userLinks = article.querySelectorAll('a[href*="/user/"], a[href*="/people/"], a[role="link"][href*="/"]');
+            const commentTexts = article.querySelectorAll('div[dir="auto"]');
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:475',message:'findCommentsSection: article analysis',data:{replyButtonCount:replyButtons.length,userLinkCount:userLinks.length,commentTextCount:commentTexts.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+            // #endregion
+            
+            // If we find multiple reply buttons or user links, this article likely contains comments
+            // Comments are usually below the post content, so look for elements after the post text
+            if (replyButtons.length >= 1 || (userLinks.length >= 2 && commentTexts.length >= 2)) {
+                // Try to find a more specific container within the article
+                // Look for divs that contain multiple reply buttons or user links
+                const potentialContainers = article.querySelectorAll('div, ul, section');
+                
+                for (const container of potentialContainers) {
+                    const containerReplyButtons = container.querySelectorAll('[data-testid*="reply"], [aria-label*="Reply"], a[href*="comment"]');
+                    const containerUserLinks = container.querySelectorAll('a[href*="/user/"], a[href*="/people/"]');
+                    
+                    // If this container has multiple reply buttons or user links, it's likely the comments section
+                    if (containerReplyButtons.length >= 2 || (containerUserLinks.length >= 2 && container.textContent.trim().length > 50)) {
+                        // #region agent log
+                        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:488',message:'findCommentsSection: found container in article',data:{containerTag:container.tagName,replyButtonCount:containerReplyButtons.length,userLinkCount:containerUserLinks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                        // #endregion
+                        console.log(`Found comments container within article with ${containerReplyButtons.length} reply buttons`);
+                        return container;
+                    }
+                }
+                
+                // If no specific container found, return the article itself
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:497',message:'findCommentsSection: found article',data:{replyButtonCount:replyButtons.length,userLinkCount:userLinks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                // #endregion
+                console.log(`Found article with comments (${replyButtons.length} reply buttons, ${userLinks.length} user links)`);
+                return article;
+            }
+        }
+        
+        // STRATEGY 2: Try Facebook-specific selectors (fallback)
         const selectors = [
             '[data-pagelet="CommentsUnit"]',
             '[data-testid="UFI2CommentsList"]',
-            '[data-testid="comments"]',
-            '.comments',
-            '[role="main"] [data-testid*="comment"]',
+            '[data-testid="UFI2CommentsListRoot"]',
+            'div[data-testid*="UFI2Comment"]',
             '[data-sigil="comments"]'
         ];
         
         for (const selector of selectors) {
             const element = document.querySelector(selector);
             if (element) {
-                console.log(`Found comments section with selector: ${selector}`);
-                return element;
+                // Check it's not extension UI
+                const elementText = element.textContent || '';
+                if (!elementText.includes('Page Comments') && 
+                    !elementText.includes('Group Comments') &&
+                    !element.closest('#reply-container, .reply-container, #commentsList')) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:515',message:'findCommentsSection: found via selector',data:{selector:selector},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                    // #endregion
+                    return element;
+                }
             }
         }
         
-        // Fallback: look for any element containing multiple comment-like elements
-        const potentialSections = document.querySelectorAll('[role="main"] > div, [data-pagelet], .story');
-        for (const section of potentialSections) {
-            const commentElements = section.querySelectorAll('[role="article"], [data-testid*="comment"], div[data-sigil*="comment"]');
-            if (commentElements.length >= 2) {
-                console.log(`Found comments section by fallback with ${commentElements.length} elements`);
-                return section;
-            }
-        }
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:523',message:'findCommentsSection: NOT FOUND',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
         
         return null;
     }
     
     findAllCommentElements(container) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:549',message:'findAllCommentElements: entry',data:{containerTag:container.tagName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
         const commentElements = [];
         
-        // Strategy 1: Use our predefined selectors
-        for (const selector of this.commentSelectors) {
-            const elements = container.querySelectorAll(selector);
-            commentElements.push(...elements);
+        // Exclude post header and extension UI
+        const excludedElements = new Set();
+        const postHeaders = container.querySelectorAll('[data-testid="post_message"], [data-testid="post_text"], [data-pagelet="PostHeader"]');
+        postHeaders.forEach(header => {
+            excludedElements.add(header);
+            header.querySelectorAll('*').forEach(child => excludedElements.add(child));
+        });
+        
+        // Exclude extension UI
+        const extensionUI = container.querySelectorAll('#reply-container, .reply-container, #commentsList, .comments-list, .comment-card');
+        extensionUI.forEach(el => {
+            excludedElements.add(el);
+            el.querySelectorAll('*').forEach(child => excludedElements.add(child));
+        });
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:567',message:'findAllCommentElements: excluded count',data:{excludedCount:excludedElements.size},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
+        // STRATEGY 1: Look for elements that have both a user link and reply button
+        // This is the most reliable indicator of a comment
+        const allDivs = container.querySelectorAll('div');
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:572',message:'findAllCommentElements: scanning divs',data:{divCount:allDivs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
+        for (const div of allDivs) {
+            if (excludedElements.has(div)) continue;
+            
+            // Check if this div has comment-like structure
+            const hasUserLink = div.querySelector('a[href*="/user/"], a[href*="/people/"], a[role="link"][href*="/"]') !== null;
+            const hasReplyButton = div.querySelector('[data-testid*="reply"], [aria-label*="Reply"], a[href*="comment"]') !== null;
+            const hasText = div.querySelector('div[dir="auto"]') !== null || (div.textContent && div.textContent.trim().length > 10);
+            
+            // If it has user link + (reply button OR text), it's likely a comment
+            if (hasUserLink && (hasReplyButton || hasText)) {
+                // Additional validation: make sure it's not just the post author
+                const text = div.textContent || '';
+                if (!text.includes('Published by') && 
+                    !text.includes('Shared with') &&
+                    !text.includes('Page Comments') &&
+                    !text.includes('Group Comments') &&
+                    text.trim().length > 20) {
+                    commentElements.push(div);
+                }
+            }
         }
         
-        // Strategy 2: Look for elements with comment-like attributes
-        const additionalSelectors = [
-            'div[data-testid*="comment"]',
-            'div[data-sigil*="comment"]',
-            'div[aria-label*="comment"]',
-            'div[role="article"]',
-            'div[data-testid*="UFI"]',
-            'div[data-testid*="Comment"]'
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:595',message:'findAllCommentElements: found via structure',data:{count:commentElements.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
+        // STRATEGY 2: Try Facebook-specific selectors
+        const fbSelectors = [
+            '[data-testid*="UFI2Comment"]',
+            '[data-testid*="UFIComment"]',
+            'div[data-testid*="comment"]'
         ];
         
-        for (const selector of additionalSelectors) {
+        for (const selector of fbSelectors) {
             const elements = container.querySelectorAll(selector);
-            commentElements.push(...elements);
-        }
-        
-        // Strategy 3: Look for elements containing user names and text
-        const allDivs = container.querySelectorAll('div');
-        for (const div of allDivs) {
-            if (this.looksLikeComment(div)) {
-                commentElements.push(div);
-            }
+            elements.forEach(el => {
+                if (!excludedElements.has(el) && !el.closest('[data-testid="post_message"]')) {
+                    if (!commentElements.includes(el)) {
+                        commentElements.push(el);
+                    }
+                }
+            });
         }
         
         // Remove duplicates
         const uniqueElements = [...new Set(commentElements)];
         
-        // Filter out elements that are too small or don't contain text (loosened)
+        // Filter out elements that are too small or don't contain valid comment text
         const filtered = uniqueElements.filter(el => {
             const text = el.textContent || '';
-            const hasText = text.trim().length > 3;
-            const hasUser = this.findUserName(el) !== '';
-            const visible = (el.offsetHeight > 0 && el.offsetWidth > 0);
-            return hasText && hasUser && visible;
+            return !this.isPostMetadata(text) && text.trim().length > 10 && text.trim().length < 2000;
         });
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:620',message:'findAllCommentElements: final count',data:{uniqueCount:uniqueElements.length,filteredCount:filtered.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         
         // Sort elements by their position in the DOM (top to bottom) to ensure consistent order
         filtered.sort((a, b) => {
@@ -1149,27 +1287,189 @@ class FacebookReplyExtractor {
         });
     }
     
+    isPostMetadata(text) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1204',message:'isPostMetadata called',data:{text:text?text.substring(0,100):null,textLength:text?text.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        if (!text || text.length < 5) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1207',message:'isPostMetadata: text too short',data:{text:text,length:text?text.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return true;
+        }
+        
+        const textLower = text.toLowerCase();
+        
+        // Common Facebook post metadata patterns
+        const metadataPatterns = [
+            /^published by/i,
+            /^shared with/i,
+            /^visible to:/i,
+            /^public$/i,
+            /^friends$/i,
+            /^only me$/i,
+            /^\d+[hdwm]$/i, // Time patterns like "4d", "2h", "3w"
+            /^·\s*\d+[hdwm]/i, // "· 4d"
+            /\bverified\s+account\b/i, // "verified account" as a phrase (not just anywhere)
+            /shared by/i,
+            /^·\s*shared with/i,
+            /^·\s*published by/i,
+            /^·\s*visible to:/i,
+            /^·\s*public$/i,
+            /^·\s*friends$/i,
+            /^·\s*\d+\s*(minute|hour|day|week|month)\s+ago/i, // "· 2 hours ago"
+            /^·\s*·/i, // Multiple dots
+            /^shared$/i,
+            /^edited$/i,
+            /^sponsored$/i,
+            /^promoted$/i
+        ];
+        
+        // Check for repetitive/spam text patterns (like "All messagesAll messagesAll messages")
+        const repetitivePattern = /^(.{2,20})\1{3,}/i; // Same phrase repeated 4+ times
+        if (repetitivePattern.test(text)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1238',message:'isPostMetadata: repetitive pattern',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return true;
+        }
+        
+        // Check for UI spam patterns (repeated words like "MessengerMessengerMessenger")
+        if (/(\w{3,})\1{2,}/i.test(text)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1244',message:'isPostMetadata: UI spam pattern',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return true;
+        }
+        
+        // Check if text matches any metadata pattern
+        for (const pattern of metadataPatterns) {
+            if (pattern.test(text)) {
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1237',message:'isPostMetadata: pattern match',data:{text:text.substring(0,100),pattern:pattern.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
+                return true;
+            }
+        }
+        
+        // Check if text is mostly metadata (contains multiple metadata indicators)
+        // Only check for specific phrases, not individual words that might appear in comments
+        const metadataPhrases = [
+            'published by',
+            'shared with',
+            'visible to',
+            'verified account',
+            'shared by'
+        ];
+        
+        let metadataPhraseCount = 0;
+        for (const phrase of metadataPhrases) {
+            if (textLower.includes(phrase)) {
+                metadataPhraseCount++;
+            }
+        }
+        
+        // If text contains 2+ metadata phrases and is short, it's likely metadata
+        if (metadataPhraseCount >= 2 && text.length < 100) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1260',message:'isPostMetadata: multiple phrases',data:{text:text.substring(0,100),metadataPhraseCount:metadataPhraseCount,textLength:text.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return true;
+        }
+        
+        // Check if text is just timestamps and separators
+        if (/^[\s·\dhdwm]+$/i.test(text.trim())) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1261',message:'isPostMetadata: timestamp only',data:{text:text},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            return true;
+        }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1265',message:'isPostMetadata: NOT metadata',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        return false;
+    }
+    
     looksLikeComment(element) {
         const text = element.textContent || '';
         const hasUser = this.findUserName(element) !== '';
         const hasReplyButton = this.findReplyButton(element) !== null;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1204',message:'looksLikeComment: checking',data:{textLength:text.length,hasUser:hasUser,hasReplyButton:hasReplyButton,isMetadata:this.isPostMetadata(text)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        
+        // Check if text is actually a comment (not metadata)
+        if (this.isPostMetadata(text)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1210',message:'looksLikeComment: rejected (metadata)',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+            return false;
+        }
+        
         const hasText = text.trim().length > 10 && text.trim().length < 500;
         
-        return hasUser && hasText && (hasReplyButton || element.querySelector('[role="button"]'));
+        // Check if element has comment-like structure even without explicit user name
+        // Look for common comment indicators: reply button, comment text area, timestamp patterns
+        const hasCommentStructure = hasReplyButton || 
+                                    element.querySelector('[data-testid*="comment"]') !== null ||
+                                    element.querySelector('[data-testid*="UFI"]') !== null ||
+                                    /^\d+[hdwm]$/i.test(text.trim()) || // Timestamp like "23m", "1h"
+                                    element.querySelector('a[href*="/comment"]') !== null;
+        
+        // More lenient: if it has comment structure and valid text, accept it even without explicit user name
+        // User name might be extracted later during extractSingleComment
+        const result = (hasUser || hasCommentStructure) && hasText && (hasReplyButton || element.querySelector('[role="button"]'));
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1220',message:'looksLikeComment: result',data:{result:result,hasText:hasText,hasUser:hasUser,hasCommentStructure:hasCommentStructure},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        
+        return result;
     }
     
     async extractSingleComment(commentElement) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1270',message:'extractSingleComment: entry',data:{elementTag:commentElement.tagName,elementClass:commentElement.className.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
         // Extract user name
         const user = this.findUserName(commentElement);
         
         // Extract comment text
         const text = this.findCommentText(commentElement);
         
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1278',message:'extractSingleComment: extracted',data:{user:user,text:text?text.substring(0,100):null,textLength:text?text.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        // Validate that we have actual comment content (not metadata)
+        if (!text || this.isPostMetadata(text)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1282',message:'extractSingleComment: rejected (no text or metadata)',data:{text:text,isMetadata:text?this.isPostMetadata(text):null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            return null; // Return null to skip this element
+        }
+        
+        // Additional validation: ensure text doesn't look like post header
+        if (text.includes('Published by') || text.includes('Shared with') || text.includes('Visible to')) {
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1287',message:'extractSingleComment: rejected (post header pattern)',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            return null;
+        }
+        
         // Generate a unique reference for this comment
         const refId = `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Store reference to the comment element
         commentElement.dataset.replyRefId = refId;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1297',message:'extractSingleComment: success',data:{user:user,text:text.substring(0,100),refId:refId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         
         return {
             user,
@@ -1180,36 +1480,95 @@ class FacebookReplyExtractor {
     }
     
     findUserName(commentElement) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1292',message:'findUserName: entry',data:{elementTag:commentElement.tagName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
+        
         // Try multiple strategies to find the user name
         for (const selector of this.userNameSelectors) {
             const userEl = commentElement.querySelector(selector);
             if (userEl && userEl.textContent.trim()) {
                 const userName = userEl.textContent.trim();
                 if (userName.length > 0 && userName.length < 100) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1300',message:'findUserName: found via selector',data:{selector:selector,userName:userName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                    // #endregion
                     return userName;
                 }
             }
         }
         
         // Fallback: look for any link or strong element that might be a username
-        const potentialUsers = commentElement.querySelectorAll('a[role="link"], strong, h3, h4, span[dir="auto"]');
+        const potentialUsers = commentElement.querySelectorAll('a[role="link"], strong, h3, h4, span[dir="auto"], a[href*="/user/"], a[href*="/people/"]');
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1308',message:'findUserName: fallback search',data:{potentialUserCount:potentialUsers.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
+        
         for (const el of potentialUsers) {
             const text = el.textContent.trim();
-            if (text.length > 0 && text.length < 50 && !text.includes(' ') && !text.includes('\n')) {
+            // Allow names with spaces (like "Alexandra Touris") but limit length
+            if (text.length > 0 && text.length < 50 && text.split(' ').length <= 3 && !text.includes('\n')) {
+                // Skip if it looks like metadata or UI text
+                if (this.isPostMetadata(text)) {
+                    continue;
+                }
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1316',message:'findUserName: found via fallback',data:{userName:text},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                // #endregion
                 return text;
             }
         }
+        
+        // Last resort: try to extract name from text content (look for capitalized name patterns)
+        const allText = commentElement.textContent || '';
+        // Look for patterns like "Alexandra Touris" or "Giuseppe Durso" (capitalized words, 2-3 words)
+        const namePattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/;
+        const nameMatch = allText.match(namePattern);
+        if (nameMatch && nameMatch[1]) {
+            const potentialName = nameMatch[1].trim();
+            // Validate it's not metadata
+            if (!this.isPostMetadata(potentialName) && potentialName.length > 3 && potentialName.length < 50) {
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1328',message:'findUserName: found via pattern',data:{userName:potentialName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                // #endregion
+                return potentialName;
+            }
+        }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1335',message:'findUserName: NOT FOUND',data:{elementText:commentElement.textContent.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         
         return '';
     }
     
     findCommentText(commentElement) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1306',message:'findCommentText: entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        
         // Try multiple strategies to find comment text
         for (const selector of this.commentTextSelectors) {
             const textEl = commentElement.querySelector(selector);
             if (textEl && textEl.textContent.trim()) {
                 const text = textEl.textContent.trim();
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1314',message:'findCommentText: found text',data:{selector:selector,text:text.substring(0,100),textLength:text.length,isMetadata:this.isPostMetadata(text)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                // #endregion
+                
+                // Filter out post metadata
+                if (this.isPostMetadata(text)) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1319',message:'findCommentText: skipped (metadata)',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                    // #endregion
+                    continue; // Skip this element, try next
+                }
+                
                 if (text.length > 5) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1324',message:'findCommentText: returning text',data:{text:text.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                    // #endregion
                     return text;
                 }
             }
@@ -1217,8 +1576,18 @@ class FacebookReplyExtractor {
         
         // Fallback: look for any div with dir="auto" that contains substantial text
         const textElements = commentElement.querySelectorAll('div[dir="auto"], span[dir="auto"]');
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1329',message:'findCommentText: fallback search',data:{textElementCount:textElements.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        
         for (const el of textElements) {
             const text = el.textContent.trim();
+            
+            // Filter out post metadata
+            if (this.isPostMetadata(text)) {
+                continue;
+            }
+            
             if (text.length > 10 && text.length < 500) {
                 return text;
             }
@@ -1226,15 +1595,22 @@ class FacebookReplyExtractor {
         
         // Last resort: get all text content and clean it up
         const allText = commentElement.textContent || '';
-        const lines = allText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        const lines = allText.split('\n').map(line => line.trim()).filter(line => {
+            // Filter out metadata lines
+            return line.length > 0 && !this.isPostMetadata(line);
+        });
         
-        // Find the longest line that's not a username (usually the comment text)
+        // Find the longest line that's not metadata (usually the comment text)
         let longestLine = '';
         for (const line of lines) {
-            if (line.length > longestLine.length && line.length < 500) {
+            if (line.length > longestLine.length && line.length < 500 && !this.isPostMetadata(line)) {
                 longestLine = line;
             }
         }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/cef55277-5c4d-4cd5-b8ac-436b6f9adce4',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'reply_content.js:1350',message:'findCommentText: final result',data:{longestLine:longestLine.substring(0,100),longestLineLength:longestLine.length,filteredLinesCount:lines.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
         
         return longestLine;
     }

@@ -137,11 +137,24 @@ class SettingsManager {
         
         modelSelect.innerHTML = '';
         
-        if (provider === 'gemini') {
+        if (provider === 'groq') {
             const models = [
-                { value: 'gemini-2.5-flash', text: 'Gemini 2.5 Flash' },
-                { value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro' },
-                { value: 'gemini-1.5-flash', text: 'Gemini 1.5 Flash' }
+                { value: 'llama-3.3-70b-versatile', text: 'Llama 3.3 70B Versatile' },
+                { value: 'llama-3.1-70b-versatile', text: 'Llama 3.1 70B Versatile' },
+                { value: 'llama-3.1-8b-instant', text: 'Llama 3.1 8B Instant' },
+                { value: 'llama-3.3-70b-versatile', text: 'Llama 3.3 70B' },
+                { value: 'mixtral-8x7b-32768', text: 'Mixtral 8x7B' }
+            ];
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.value;
+                option.textContent = model.text;
+                modelSelect.appendChild(option);
+            });
+        } else if (provider === 'grok') {
+            const models = [
+                { value: 'grok-beta', text: 'Grok Beta' },
+                { value: 'grok-2', text: 'Grok 2' }
             ];
             models.forEach(model => {
                 const option = document.createElement('option');
@@ -276,12 +289,13 @@ class SettingsManager {
         const defaults = this.aiConfig.defaults;
         
         document.getElementById('defaultTone').value = defaults.tone;
-        document.getElementById('defaultLanguage').value = defaults.language;
+        // Language is always auto-detected
         document.getElementById('maxReplyLength').value = defaults.maxReplyLength;
         document.getElementById('minDelay').value = Math.floor(defaults.limits.minDelayMs / 1000);
         document.getElementById('maxDelay').value = Math.floor(defaults.limits.maxDelayMs / 1000);
         document.getElementById('dailyCap').value = defaults.limits.dailyCap;
         document.getElementById('relevance').value = defaults.relevance;
+        document.getElementById('defaultLanguage').value = defaults.language;
         document.getElementById('noUrls').checked = defaults.safety.noUrls;
         document.getElementById('profanityFilter').checked = defaults.safety.profanityFilter;
         document.getElementById('replyOncePerUser').checked = defaults.replyOncePerUser;
