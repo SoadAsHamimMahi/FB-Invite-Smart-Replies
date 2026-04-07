@@ -1592,11 +1592,13 @@ class ManualReplyController {
             }
             
             // Ensure script is injected (fallback if not already injected by icon click)
+            let startAccepted = false;
             try {
-                await chrome.tabs.sendMessage(tab.id, {
+                const response = await chrome.tabs.sendMessage(tab.id, {
                     type: 'startInviteProcess',
                     settings: this.inviteSettings
                 });
+                startAccepted = !!(response && response.started);
             } catch (error) {
                 // If message fails, script might not be injected, so inject it now
                 await chrome.scripting.executeScript({
@@ -1605,16 +1607,21 @@ class ManualReplyController {
                 });
                 
                 // Wait a bit for script to initialize, then send message
-                setTimeout(async () => {
-                    await chrome.tabs.sendMessage(tab.id, {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const retryResponse = await chrome.tabs.sendMessage(tab.id, {
                         type: 'startInviteProcess',
                         settings: this.inviteSettings
                     });
-                }, 100);
+                startAccepted = !!(retryResponse && retryResponse.started);
             }
-            
-            this.showStatus('Invite process started successfully', 'success');
-            document.getElementById('inviteStatus').textContent = 'Invite process is running...';
+
+            if (startAccepted) {
+                this.showStatus('Invite process started successfully', 'success');
+                document.getElementById('inviteStatus').textContent = 'Invite process is running...';
+            } else {
+                this.showStatus('Invite process did not start', 'error');
+                document.getElementById('inviteStatus').textContent = 'Ready to start';
+            }
             
         } catch (error) {
             console.error('Error starting invite process:', error);

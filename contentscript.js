@@ -748,6 +748,9 @@ function getStringBtnByLang(lang, secondVariableGenerate) {
     if (checkInsideScrolledWindow == "") {
         if (getElem(scrollingNewFBDesignClass).length > 0) checkInsideScrolledWindow = scrollingNewFBDesignClass + " ";
         else if (getElem(scrollingNewFBDesignClassDef).length > 0) checkInsideScrolledWindow = scrollingNewFBDesignClassDef + " ";
+        // 2026-04: Business Suite fallback - detect reaction panel by role=tablist or specific aria labels
+        else if ($('div[aria-label="Reactions"]').length > 0) checkInsideScrolledWindow = 'div[aria-label="Reactions"] ';
+        else if ($('div[role="tablist"]').length > 0 && window.location.href.indexOf('business.') > -1) checkInsideScrolledWindow = 'div[role="tablist"] ';
     }
     if (lang && lang.length > 1 && fbInviteBtnArray[lang]) {
         for (i = 0; i < fbInviteBtnArray[lang]["inv"].length; i++) {
@@ -779,12 +782,184 @@ function getTextForCurrentLanguage(whatWeNeed) {
     else return whatWeNeed;
 }
 
+// Helper: find the reactions modal container (works for both FB and Business Suite)
+function getReactionsModalContainer() {
+    // Standard FB: div[role="dialog"]
+    if ($('div[role="dialog"]').length > 0) return 'div[role="dialog"]';
+    // Business Suite: the floating reactions popup is a div with tablist (reaction type tabs) inside
+    // Try to find any visible container that holds Invite/Invited buttons
+    var bsSelectors = [
+        'div[data-testid="reaction_profile_browsers"]',
+        'div[aria-label="Reactions"]',
+        'div[aria-label*="reaction"]',
+        'div[aria-label*="Reaction"]',
+        // Generic: any overlay div that has a close button and a reaction tab list
+        'div[role="tablist"]'
+    ];
+    for (var si = 0; si < bsSelectors.length; si++) {
+        if ($(bsSelectors[si]).length > 0) {
+            // Walk up to find a scrollable ancestor that wraps the list
+            var el = $(bsSelectors[si]).first().closest('div[style], div[class]');
+            if (el.length > 0) return bsSelectors[si];
+        }
+    }
+    return null;
+}
+
+function getReactionsModalRoot() {
+    var tabList = $('div[role="dialog"] div[role="tablist"]:visible, div[aria-label="Reactions"] div[role="tablist"]:visible, div[data-testid="reaction_profile_browsers"] div[role="tablist"]:visible').last();
+    if (tabList.length > 0) {
+        var dialogRoot = tabList.closest('div[role="dialog"], div[aria-label="Reactions"], div[data-testid="reaction_profile_browsers"]');
+        if (dialogRoot.length > 0) return dialogRoot.first();
+    }
+
+    var directRoot = $('div[aria-label="Reactions"]:visible, div[data-testid="reaction_profile_browsers"]:visible').last();
+    if (directRoot.length > 0) return directRoot.first();
+
+    return $();
+}
+
+function getReactionTabLabel(tabEl) {
+    if (!tabEl || $(tabEl).length === 0) return "";
+    var $tab = $(tabEl).first();
+    var ariaLabel = ($tab.attr("aria-label") || "").trim();
+    if (ariaLabel.length > 0) return ariaLabel.replace(/\s+/g, " ");
+
+    var text = $tab
+        .find('span[dir="auto"], span')
+        .map(function () {
+            return ($(this).text() || "").trim();
+        })
+        .get()
+        .filter(function (item) {
+            return item.length > 0;
+        })
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (text.length > 0) return text;
+
+    var imgAlt = (($tab.find("img").first().attr("alt") || "") + "").trim();
+    if (imgAlt.length > 0) return imgAlt;
+
+    return "";
+}
+
+function setCurrentReactionScanLabel(label) {
+    currentReactionScanLabel = (label || "").replace(/\s+/g, " ").trim();
+    updateReactionScanIndicator();
+}
+
+function getCurrentSelectedReactionTab() {
+    var root = getReactionsModalRoot();
+    if (root.length === 0) return $();
+
+    var selectedTab = root
+        .find('[role="tab"][aria-selected="true"], div[aria-selected="true"]')
+        .filter(function () {
+            return $(this).is(":visible");
+        })
+        .first();
+
+    if (selectedTab.length > 0) return selectedTab;
+    return $();
+}
+
+function updateReactionScanIndicator() {
+    var root = getReactionsModalRoot();
+    var indicator = $("#fbe-reaction-scan-indicator");
+    var label = currentReactionScanLabel;
+
+    if (!label) {
+        var selectedTab = getCurrentSelectedReactionTab();
+        label = getReactionTabLabel(selectedTab);
+    }
+
+    if (root.length === 0 || !label) {
+        indicator.remove();
+        return;
+    }
+
+    if (indicator.length === 0) {
+        indicator = $('<div id="fbe-reaction-scan-indicator" class="fbe-reaction-scan-indicator"></div>');
+    }
+
+    if (root.css("position") === "static") root.css("position", "relative");
+    indicator.text("Scanning: " + label);
+    if (!root.find("#fbe-reaction-scan-indicator").length) root.append(indicator);
+}
+
+function getReactionTabsForScanning(includeSelected) {
+    var root = getReactionsModalRoot();
+    if (root.length === 0) return $();
+
+    var tabs = root
+        .find('[role="tab"], div[aria-selected]')
+        .filter(function () {
+            if (!$(this).is(":visible")) return false;
+            if ($(this).attr("aria-disabled") === "true") return false;
+            if ($(this).parents('[aria-hidden="true"]').length > 0) return false;
+            if (!includeSelected && $(this).attr("aria-selected") === "true") return false;
+            return $(this).find("img").length > 0 || getReactionTabLabel(this).length > 0;
+        });
+
+    return tabs;
+}
+
+function getReactionInviteRows() {
+    var root = getReactionsModalRoot();
+    if (root.length === 0) return [];
+
+    return root
+        .find('div[role="button"]')
+        .filter(function () {
+            var txt = ($(this).text() || "").trim();
+            return txt === "Invite" || txt === "Invited" || txt === "Following" || txt === "Follow";
+        })
+        .map(function () {
+            var row = $(this).closest('div[data-visualcompletion="ignore-dynamic"]');
+            if (row.length > 0) return row[0];
+
+            row = $(this).closest('[role="row"], li, div.x78zum5');
+            if (row.length > 0) return row[0];
+
+            return $(this).closest("div")[0];
+        })
+        .get();
+}
+
+function triggerReactionScrollEvents(scrollTarget) {
+    if (!scrollTarget || $(scrollTarget).length === 0) return;
+
+    var el = $(scrollTarget)[0];
+    try {
+        el.dispatchEvent(new Event("scroll", { bubbles: true }));
+        el.dispatchEvent(new WheelEvent("wheel", { deltaY: 300, bubbles: true }));
+        el.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 10, clientY: 10 }));
+    } catch (e) {}
+
+    try {
+        $(scrollTarget).trigger("scroll");
+    } catch (e2) {}
+}
+
 function getNewInviteButtonsByText() {
     return getNewInviteButtonsByText2()
         .filter(function () {
             // 20201229 - we add a check that we MUST have .parents('div[role="dialog"]') here
+            // 2026-04 UPDATED: also accept Business Suite reactions panel (no role=dialog)
             if ($(this).parents('div[role="dialog"]').length > 0) return true;
-            else return false;
+            // Business Suite fallback: accept if inside any overlay containing a tab list / reaction panel
+            if (
+                $(this).parents('[data-testid="reaction_profile_browsers"]').length > 0 ||
+                $(this).parents('[aria-label="Reactions"]').length > 0 ||
+                $(this).parents('div[role="tablist"]').length > 0 ||
+                // Also accept if there is no dialog at all on the page (Business Suite mode)
+                ($('div[role="dialog"]').length === 0 && $('div[role="tablist"]').length > 0)
+            ) return true;
+            // Last resort: if we know we are on business.facebook.com and there's no dialog, accept it
+            if (window.location.href.indexOf('business.') > -1 && $('div[role="dialog"]').length === 0) return true;
+            return false;
         })
         .closest('div[role="button"]')
         .not('div.fbNubFlyout[role="dialog"] div[role="button"],.uiLayer._31e div[role="dialog"] div[role="button"]')
@@ -798,12 +973,6 @@ function getNewInviteButtonsByText() {
                         ret = false;
                     }
                 });
-            //if (ret){
-            // verify also we don't have scroll inside scroll
-            //	if ($(outerThis).parents(newclass).length!=0){
-            //		ret=false;
-            //	}
-            //}
             return ret;
         });
 }
@@ -1126,6 +1295,7 @@ if (document.location.href.indexOf("facebook.com") > -1 && !doNotStartNowFix && 
     var scan_reactions_tabs = false;
     var scan_reactions_tabs_more1 = true;
     var scan_current_tab_business_suite = true;
+    var currentReactionScanLabel = "";
     var name_comm_filter1 = "";
     var accept_ashii_names_only = false;
     var ascii = /^[ -~]+$/;
@@ -8404,18 +8574,9 @@ function StartInvitePeople() {
                     });
                 }
                 //console.log("first check:"+bigPostTabs.length);
-                if (
-                    bigPostTabs.length == 0 &&
-                    getNewUIMainScrollOnly('div[aria-label="Reactions"] div[aria-hidden="false"],div[aria-label="Reazioni"] div[aria-hidden="false"]').filter(function () {
-                        return $(this).attr("aria-selected") && $(this).attr("aria-selected") == "false";
-                    }).length > 0
-                ) {
+                if (bigPostTabs.length == 0 && getReactionTabsForScanning(true).length > 0) {
                     //console.log("a1");
-                    getNewUIMainScrollOnly('div[aria-label="Reactions"] div[aria-hidden="false"],div[aria-label="Reazioni"] div[aria-hidden="false"]')
-                        .filter(function () {
-                            return $(this).attr("aria-selected") && $(this).attr("aria-selected") == "false";
-                        })
-                        .each(function (index) {
+                    getReactionTabsForScanning(true).each(function (index) {
                             //console.log("a2");
                             if ($(this).find("img").length > 0 && $(this).find("img").attr("src") && checkInArrayIconNewFB($(this).find("img").attr("src"), fbEmotionsBtnArray["newEmoLink"]["like"]) && !skip_like_emotion)
                                 bigPostTabs.push($(this));
@@ -8433,8 +8594,8 @@ function StartInvitePeople() {
                                 bigPostTabs.push($(this));
                         });
                 }
-                if (bigPostTabs.length == 0 && getNewUIMainScrollOnly('.lisst02g.x1emribx .qi72231t[role="tab"]', '.qi72231t[aria-disabled="true"]').length > 0) {
-                    getNewUIMainScrollOnly('.lisst02g.x1emribx .qi72231t[role="tab"]', '.qi72231t[aria-disabled="true"]').each(function (index) {
+                if (bigPostTabs.length == 0 && getReactionTabsForScanning(true).length > 0) {
+                    getReactionTabsForScanning(true).each(function (index) {
                         if ($(this).find("img").length > 0 && $(this).find("img").attr("src") && checkInArrayIconNewFB($(this).find("img").attr("src"), fbEmotionsBtnArray["newEmoLink"]["like"]) && !skip_like_emotion)
                             bigPostTabs.push($(this));
                         else if ($(this).find("img").length > 0 && $(this).find("img").attr("src") && checkInArrayIconNewFB($(this).find("img").attr("src"), fbEmotionsBtnArray["newEmoLink"]["angry"]) && !skip_angry_emotion)
@@ -8510,11 +8671,7 @@ function openedPostHasTooManyLikes() {
 
         //20200910 - new UI big posts
         var returnLoop = false;
-        getNewUIMainScrollOnly('div[aria-label="Reactions"] div[aria-hidden="false"],div[aria-label="Reazioni"] div[aria-hidden="false"]')
-            .filter(function () {
-                return $(this).attr("aria-selected") && $(this).attr("aria-selected") == "false";
-            })
-            .each(function (index) {
+        getReactionTabsForScanning(true).each(function (index) {
                 if (!returnLoop && $(this).find('span[dir="auto"]').length > 0 && checkArrayInString($(this).find('span[dir="auto"]').text())) returnLoop = true;
             });
         if (returnLoop) return returnLoop;
@@ -8550,7 +8707,10 @@ function StartInvitePeopleOLD(useTab) {
 
         // if we have to open a tab, open it first!
         if (useTab > -1) {
-            if (bigPostTabs.length > useTab && $(bigPostTabs[useTab]).length > 0) $(bigPostTabs[useTab])[0].click();
+            if (bigPostTabs.length > useTab && $(bigPostTabs[useTab]).length > 0) {
+                setCurrentReactionScanLabel(getReactionTabLabel(bigPostTabs[useTab]));
+                $(bigPostTabs[useTab])[0].click();
+            }
             // after timeout
 
             // 20180815 - clean all variables:
@@ -8563,7 +8723,10 @@ function StartInvitePeopleOLD(useTab) {
             setTimeout(function () {
                 InvitePeople(useTab);
             }, 1000);
-        } else InvitePeople(useTab);
+        } else {
+            setCurrentReactionScanLabel(getReactionTabLabel(getCurrentSelectedReactionTab()));
+            InvitePeople(useTab);
+        }
     }
 }
 
@@ -8660,8 +8823,22 @@ function InvitePeople2(useTab) {
                     //console.log('3More buttons load click:' + uiMorePagerPrimary + '. Skip first buttons: ' + canSKIPButton);
                     clickedForMore = 1;
                     _tempTimeoutLoc1 = Math.floor(Date.now());
-                    if (getElem(scrollingNewFBDesignClassDef).length > 0) getScrollElemNewFb(scrollingNewFBDesignClassDef).scrollTop(56 * 999999);
-                    if (getElem(scrollingNewFBDesignClass).length > 0) getScrollElemNewFb(scrollingNewFBDesignClass).scrollTop(56 * 999999);
+                    if (getElem(scrollingNewFBDesignClassDef).length > 0) {
+                        var _scrollEl5 = getScrollElemNewFb(scrollingNewFBDesignClassDef);
+                        _scrollEl5.scrollTop(56 * 999999);
+                        triggerReactionScrollEvents(_scrollEl5);
+                    }
+                    if (getElem(scrollingNewFBDesignClass).length > 0) {
+                        var _scrollEl6 = getScrollElemNewFb(scrollingNewFBDesignClass);
+                        _scrollEl6.scrollTop(56 * 999999);
+                        triggerReactionScrollEvents(_scrollEl6);
+                    }
+                } else if (newFBinviteDesign && doScrollForBS(999999 * 56)) {
+                    // Business Suite: old FB classes absent, use tablist-based scroll
+                    uiMorePagerPrimary++;
+                    updatePopup();
+                    clickedForMore = 1;
+                    _tempTimeoutLoc1 = Math.floor(Date.now());
                 }
                 //if (clickedForMore==1 && $('.uiScrollableArea .uiScrollableAreaWrap').length>0)
                 //setTimeout(function(){$('.uiScrollableArea .uiScrollableAreaWrap').scrollTop(4000*(uiMorePagerPrimary+1));},1000);
@@ -8810,6 +8987,7 @@ function InvitePeople2(useTab) {
 function InvitePeople(useTab) {
     if (debug) console.log("InvitePeople");
     if (scriptIsRunning == 1) {
+        if (scan_reactions_tabs) setCurrentReactionScanLabel(getReactionTabLabel(getCurrentSelectedReactionTab()));
         //console.log('InvitePeople. hadInvitedButton=' + hadInvitedButton + '. canSKIPButton = ' + canSKIPButton);
         if (hadInvitedButton > 0) hadInvitedButton = hadInvitedButton * 2 + 2;
         canSKIPButton = canSKIPButton - hadInvitedButton;
@@ -9506,10 +9684,17 @@ function inviteNextNewUI(i, inputs, useTab) {
                 else heighOfLikesDivBtn = 56;
                 if (newFBinviteDesign && getElem(scrollingNewFBDesignClass).length > 0) {
                     uiMorePagerPrimary++;
-                    getScrollElemNewFb(scrollingNewFBDesignClass).scrollTop(heighOfLikesDivBtn * i - 220);
+                    var _scrollEl3 = getScrollElemNewFb(scrollingNewFBDesignClass);
+                    _scrollEl3.scrollTop(heighOfLikesDivBtn * i - 220);
+                    triggerReactionScrollEvents(_scrollEl3);
                 } else if (newFBinviteDesign && getElem(scrollingNewFBDesignClassDef).length > 0) {
                     uiMorePagerPrimary++;
-                    getScrollElemNewFb(scrollingNewFBDesignClassDef).scrollTop(heighOfLikesDivBtn * i - 220);
+                    var _scrollEl4 = getScrollElemNewFb(scrollingNewFBDesignClassDef);
+                    _scrollEl4.scrollTop(heighOfLikesDivBtn * i - 220);
+                    triggerReactionScrollEvents(_scrollEl4);
+                } else if (newFBinviteDesign) {
+                    // Business Suite fallback: scroll by native JS + dispatch event
+                    if (doScrollForBS(heighOfLikesDivBtn * i - 220)) uiMorePagerPrimary++;
                 }
                 updatePopup();
             }
@@ -9869,11 +10054,24 @@ function inviteNextNewUI(i, inputs, useTab) {
             if (newFBinviteDesign && getElem(scrollingNewFBDesignClass).length > 0) {
                 uiMorePagerPrimary++;
                 updatePopup();
-                getScrollElemNewFb(scrollingNewFBDesignClass).scrollTop(heighOfLikesDivBtn * i - 220);
+                var _scrollEl1 = getScrollElemNewFb(scrollingNewFBDesignClass);
+                _scrollEl1.scrollTop(heighOfLikesDivBtn * i - 220);
+                triggerReactionScrollEvents(_scrollEl1);
+                clickedForMore = 1;
             } else if (newFBinviteDesign && getElem(scrollingNewFBDesignClassDef).length > 0) {
                 uiMorePagerPrimary++;
                 updatePopup();
-                getScrollElemNewFb(scrollingNewFBDesignClassDef).scrollTop(heighOfLikesDivBtn * i - 220);
+                var _scrollEl2 = getScrollElemNewFb(scrollingNewFBDesignClassDef);
+                _scrollEl2.scrollTop(heighOfLikesDivBtn * i - 220);
+                triggerReactionScrollEvents(_scrollEl2);
+                clickedForMore = 1;
+            } else if (newFBinviteDesign) {
+                // Business Suite fallback: native scroll + event dispatch
+                if (doScrollForBS(56 * 999999)) {
+                    uiMorePagerPrimary++;
+                    clickedForMore = 1;
+                    updatePopup();
+                }
             }
             if (deleteInvitersLocal) i = 1;
             setTimeout(function () {
@@ -9889,10 +10087,14 @@ function updatePopup(addMessage, loopShow) {
         if (typeof addMessage === "undefined") {
             addMessage = "";
         }
+        updateReactionScanIndicator();
         if (uiMorePagerPrimary > 0) {
             if (newFBinviteDesign) {
                 if (scanByNameNewUI) {
-                    if (scan_reactions_tabs) addMessage = ". Reactions scanned (only for current reaction): " + likeButtonsElaborated + addMessage;
+                    if (scan_reactions_tabs) {
+                        var reactionInfo = currentReactionScanLabel ? " [" + currentReactionScanLabel + "]" : "";
+                        addMessage = ". Reactions scanned (only for current reaction" + reactionInfo + "): " + likeButtonsElaborated + addMessage;
+                    }
                     else addMessage = ". Reactions scanned: " + likeButtonsElaborated + addMessage;
                 } else addMessage = ". List was scrolled: " + uiMorePagerPrimary + addMessage;
             } else addMessage = ". ’See more’ button clicked: " + uiMorePagerPrimary + addMessage;
@@ -10124,6 +10326,7 @@ function showLessInfoRunning() {
 function destroyPopup() {
     //console.log('destroyPopup');
     if (popup && popup.parentElement) popup.parentElement.removeChild(popup);
+    $("#fbe-reaction-scan-indicator").remove();
     scriptIsRunning = 0;
 }
 
@@ -10514,7 +10717,6 @@ function inviteWindowInNewUIOpen() {
                     }).length > 0
             ) {
                 return true;
-                //getElem('div').filter(function(){return ($(this).attr('aria-label')=='Reactions')}).find('div').filter(function(){return ($(this).attr('aria-label')=='Close')})
             }
         }
     }
@@ -10522,12 +10724,11 @@ function inviteWindowInNewUIOpen() {
 }
 
 function closeInviteWindowInNewUI() {
+    $("#fbe-reaction-scan-indicator").remove();
     if (isThisNewFbDesign2020()) {
-        //console.log("QQQQ close invite window");
         if (getNewUIMainScrollOnly('div[role="dialog"] .cypi58rs .thwo4zme,div[role="dialog"] .dhix69tm div[role="button"].thwo4zme').not('div.fbNubFlyout[role="dialog"] div,.uiLayer._31e div[role="dialog"] div').length == 1)
             getNewUIMainScrollOnly('div[role="dialog"] .cypi58rs .thwo4zme,div[role="dialog"] .dhix69tm div[role="button"].thwo4zme').not('div.fbNubFlyout[role="dialog"] div,.uiLayer._31e div[role="dialog"] div')[0].click();
         else if (getElem('.cypi58rs .oajrlxb2,div[role="dialog"] .p9ctufpz.rj0o91l8>div[role="button"]', ".poy2od1o .cypi58rs .oajrlxb2").length > 0)
-            // .poy2od1o чтобы исключить кнопку "чата" справа снизу
             getElem('.cypi58rs .oajrlxb2,div[role="dialog"] .p9ctufpz.rj0o91l8>div[role="button"]', ".poy2od1o .cypi58rs .oajrlxb2")[0].click();
         else if (getElem('div[role="dialog"] .x1d52u69>div[role="button"]' + server_main_close_invite_window).length > 0) getElem('div[role="dialog"] .x1d52u69>div[role="button"]' + server_main_close_invite_window)[0].click();
         else if (
@@ -10609,9 +10810,114 @@ function getNewUIMainScrollOnly(newclass, newclass2) {
             });
     }
 }
+// Business Suite scroll helper: finds the reactions modal scroll container
+// using div[role="tablist"] as an anchor, then scrolls it using native JS + 
+// fires a real browser scroll event so React lazy-loads the next batch of users.
+// Returns true if scroll was performed, false if container not found.
+function doScrollForBS(value) {
+    var scrollEl = null;
+    var root = getReactionsModalRoot();
+    if (root.length === 0) return false;
+
+    root.find("div").each(function () {
+        if (scrollEl) return false;
+        var ov = $(this).css("overflow-y");
+        var hasScrollableSpace = this.scrollHeight > this.clientHeight + 40;
+        var hasInviteButtons = $(this).find('div[role="button"]').filter(function () {
+            var txt = ($(this).text() || "").trim();
+            return txt === "Invite" || txt === "Invited" || txt === "Following" || txt === "Follow";
+        }).length > 0;
+        if ((ov === "auto" || ov === "scroll") && hasScrollableSpace && hasInviteButtons) {
+            scrollEl = this;
+            return false;
+        }
+    });
+
+    if (!scrollEl) return false;
+
+    var previousTop = scrollEl.scrollTop;
+    var rows = getReactionInviteRows();
+    var lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+
+    if (lastRow && typeof lastRow.scrollIntoView === "function") {
+        try {
+            lastRow.scrollIntoView({ block: "end", inline: "nearest", behavior: "instant" });
+        } catch (e1) {
+            try {
+                lastRow.scrollIntoView(false);
+            } catch (e2) {}
+        }
+    }
+
+    // Move relative as well; a huge absolute scrollTop alone is not always enough for FB's lazy list.
+    var nextTop = Math.max(previousTop + 500, value);
+    scrollEl.scrollTop = nextTop;
+
+    // If Facebook keeps us at the same spot, force one more nudge.
+    if (scrollEl.scrollTop === previousTop) scrollEl.scrollTop = previousTop + 900;
+
+    // Dispatch native scroll + wheel events so React's IntersectionObserver
+    // and virtual scroll listeners trigger the next batch of users to load
+    try {
+        scrollEl.dispatchEvent(new Event('scroll', { bubbles: true }));
+        scrollEl.dispatchEvent(new WheelEvent('wheel', { deltaY: 200, bubbles: true }));
+        scrollEl.dispatchEvent(new WheelEvent('wheel', { deltaY: 900, bubbles: true }));
+    } catch(e) {}
+
+    return scrollEl.scrollTop !== previousTop || rows.length > 0;
+}
+
 function getScrollElemNewFb(newclass) {
+    // 1. Try the original selector first (normal Facebook)
     if (getNewUIMainScrollOnly(newclass).length > 0) return getNewUIMainScrollOnly(newclass);
-    else return getElem(newclass);
+
+    // 2. Try known normal FB dialog scroll wrappers (standard facebook.com)
+    var normalFbRes = $('div[role="dialog"] .xb57i2i, div[role="dialog"] .x1y1aw1k').first();
+    if (normalFbRes.length > 0) return normalFbRes;
+
+    // 3. BUSINESS SUITE: Use div[role="tablist"] (the All/Like/Love/Haha tabs) as a landmark.
+    //    This tablist ONLY exists inside the reactions popup — NOT in the post comments area.
+    //    The scrollable user-list panel is a sibling/child of this tablist's parent container.
+    var root = getReactionsModalRoot();
+    if (root.length > 0) {
+        var panelContainer = $();
+        root.find("div").each(function () {
+            if (panelContainer.length > 0) return false;
+            var ov = $(this).css("overflow-y");
+            var hasScrollableSpace = this.scrollHeight > this.clientHeight + 40;
+            var hasInviteButtons = $(this).find('div[role="button"]').filter(function () {
+                var txt = ($(this).text() || "").trim();
+                return txt === "Invite" || txt === "Invited" || txt === "Following" || txt === "Follow";
+            }).length > 0;
+            if ((ov === "auto" || ov === "scroll") && hasScrollableSpace && hasInviteButtons) {
+                panelContainer = $(this);
+                return false;
+            }
+        });
+        if (panelContainer.length > 0) return panelContainer;
+    }
+
+    // 4. Walk up from an Invite/Invited button, but require the container to hold
+    //    MULTIPLE buttons — this ensures we grab the list wrapper, not a lone row div
+    //    or the comments section (which has fewer Invite-type buttons).
+    var inviteBtn = $('div[role="button"]').filter(function() {
+        var t = $(this).text().trim();
+        return t === 'Invite' || t === 'Invited';
+    }).first();
+    if (inviteBtn.length > 0) {
+        var scrollableParent = null;
+        inviteBtn.parents('div').each(function() {
+            var ov = $(this).css('overflow-y');
+            if ((ov === 'auto' || ov === 'scroll') && $(this).find('div[role="button"]').length >= 3) {
+                scrollableParent = $(this);
+                return false;
+            }
+        });
+        if (scrollableParent) return scrollableParent;
+    }
+
+    // 5. Last resort: original selector as-is
+    return getElem(newclass);
 }
 
 // 202102xx
@@ -10959,7 +11265,7 @@ var listenerInit;
 if (listenerInit) FileAlreadyLoadedThisIsNOTerror();
 listenerInit = true;
 
-api.runtime.onMessage.addListener(function (request, sender) {
+api.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     // Handle startInviteProcess message from popup
     if (request.type == "startInviteProcess") {
         // Apply settings if provided
@@ -10982,10 +11288,25 @@ api.runtime.onMessage.addListener(function (request, sender) {
         
         // Set flag that we're using popup UI
         startedFromPopupUI = true;
-        
-        // DON'T call do1() here - let the normal flow handle it
-        // The just_start() function will be called by the normal flow
-        return;
+
+        // If the previous run left stale UI behind, clear it before starting again.
+        if (scriptIsRunning != 1) {
+            if (document.getElementById("add-all-div-sw") && popup) destroyPopup();
+            $("#fbe-reaction-scan-indicator").remove();
+            waitingForReply = false;
+            pauseScriptDueToSeparateTabScanning = false;
+            clearTimeout(loopTimerDelay);
+            clearTimeout(TimerDelayVar1);
+            clearTimeout(TimerDelayVar2);
+            clearTimeout(timer_CheckSecondTabExsist);
+
+            setTimeout(function () {
+                just_start();
+            }, 50);
+        }
+
+        sendResponse({ started: scriptIsRunning != 1, alreadyRunning: scriptIsRunning == 1 });
+        return true;
     }
 
     if (scriptIsRunning == 1 && waitingForReply) {
